@@ -1,0 +1,4 @@
+# Jupyter
+ipykernel
+jupyterlab
+pyarrow

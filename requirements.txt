@@ -1,0 +1,7 @@
+torch
+torchvision
+numpy
+pandas>=1.0.0
+progressbar2 # a better progress barthan tqdm
+typer
+lifelines~=0.26.0

@@ -1,0 +1,16 @@
+# Generic
+pre-commit
+
+# Testing
+pytest
+pytest-cov
+pytest_mock
+pytest-benchmark
+tox
+tox-pyenv
+
+# coverage
+coverage
+Sphinx
+sphinx_rtd_theme
+pytest_cov
