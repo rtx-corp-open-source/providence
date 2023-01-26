@@ -3,46 +3,36 @@ Overview
 
 Purpose
 ^^^^^^^
-This package is a library of functions and objects that can be used to work with populations of data.
+
 
 
 Use Cases
 ^^^^^^^^^
 
-- Defining independent and dependent variables
-- Defining models that calculate dependent variables
+- 
 
 Permitted Scope
 ^^^^^^^^^^^^^^^
 
-- Parameter definition
-- Parameter models
-- General purpose validation routines (no tech data, may be removed in a future update)
-- Plotting utilities (will be removed in a future update)
+- 
 
 Unpermitted Scope
 ^^^^^^^^^^^^^^^^^
 
-- Algorithms for predicting outputs
-- Algorithms that work with models to determine information about the model
-  - Ex 1. Sensitivity analysis
-- Creation of statistical models
-- Very common and more intricate capabilities that are used enough that they should be their own package.
-  - Ex 1. Population-based optimization algorithms work with a population of design instances, but are far more complex than this package intends. Optimization belongs in a separate package that leverages the capabilities herein.
-  - Ex 2. DOE generation is ubiquitous and, while it could fit into this package, may be better served elsewhere.
+- 
 
 Location
 ^^^^^^^^
 
-Code: https://github.devops.utc.com/Type-C-Lite/CARDS-parameters
+Code: https://github.devops.utc.com/Type-C-Lite/RTXDS-providence
 
-Documentation, examples, contributing: https://cards.rtxdatascience.com/_static/cards_parameters/latest/index.html
+Documentation, examples, contributing: https://providence.rtxai.com
 
 
 History
 ^^^^^^^
 
-In 2018, the CSE methods team had weekly 4-6 hour meetings where they argued over how to make this package as user friendly as possible. They succeeded.
+
 
 
 Compliance
@@ -98,4 +88,4 @@ Points of Contact
 
 - RTX: Joe Calogero (joseph.calogero@rtx.com)
 - PWA: Chris Ruoti (Christopher.ruoti@prattwhitney.com)
-- PWC: Dan Fudge (Daniel.fudge@pwc.ca)
+- PWC: TBD
