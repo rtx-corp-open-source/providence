@@ -1,0 +1,18 @@
+{
+    "model": {
+        "model_type": ["gru", "lstm"],
+        "hidden_size": [32, 64, 128, 256, 512],
+        "n_layers": [4],
+        "n_attention_heads": [4],
+        "dropout": [0.1, 0.9],
+        "layer_norm_eps": [1e-5, 1e-4, 3e-4, 1e-3]
+    },
+    "optimizer": {
+        "lr": [3e-2, 1e-2]
+    },
+    "general": {
+        "num_epochs": [100],
+        "bs": [64, 128],
+        "seed": ["random", 14682599077633313808, 1123705791327780546]
+    }
+}

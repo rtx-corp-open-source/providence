@@ -1,0 +1,4 @@
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
+
+. # primary dependencies are in setup.cfg

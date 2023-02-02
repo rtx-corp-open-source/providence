@@ -1,0 +1,6 @@
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
+
+# Jupyter
+ipykernel
+jupyterlab

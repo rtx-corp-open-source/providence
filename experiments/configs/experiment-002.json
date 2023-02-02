@@ -1,0 +1,63 @@
+{
+    "backblaze": [
+        {
+            "paths": [
+                "./outputs/research-run-outputs/Backblaze-transformer-FINAL-redo/Backblaze.20211109-transformer-complete/transformer-n_attention_heads2-n_layers2-hidden_size64-dropout0.1-layer_norm_eps1e-05-lr0.01-num_epochs500-seed14682599077633313808-bs128-run_namehigh lr 2021-11-08_22:19:53-2021-11-08T22:47:20",
+                "./outputs/research-run-outputs/Backblaze-transformer-FINAL-redo/Backblaze.20211109-transformer-complete/transformer-n_attention_heads4-n_layers4-hidden_size128-dropout0.5-layer_norm_eps1e-05-lr0.01-num_epochs500-seed14682599077633313808-bs64-run_namehigh lr 2021-11-08_22:19:53-2021-11-09T23:51:17",
+                "./outputs/research-run-outputs/Backblaze-transformer-FINAL-redo/Backblaze.20211109-transformer-complete/transformer-n_attention_heads2-n_layers4-hidden_size128-dropout0.5-layer_norm_eps1e-05-lr0.01-num_epochs500-seed14682599077633313808-bs64-run_namehigh lr 2021-11-08_22:19:53-2021-11-09T21:25:50"
+            ]
+        }
+    ],
+    "backblazeextended": [
+        {
+            "paths": [
+                "./outputs/research-run-outputs/BackblazeExtended.20211007-transformer-final/transformer-n_layers4-hidden_size512-layer_norm_eps1e-05-dropout0.9-n_attention_heads4-positional_encoding700-lr0.01-num_epochs500-bs128-seedrandom-2021-10-07T11:28:03'",
+                "./outputs/research-run-outputs/BackblazeExtended.20211007-transformer-final/transformer-n_layers4-hidden_size512-layer_norm_eps1e-05-dropout0.9-n_attention_heads4-positional_encoding700-lr0.003-num_epochs500-bs128-seedrandom-2021-10-07T12:09:10'",
+                "./outputs/research-run-outputs/BackblazeExtended.20211007-transformer-final/transformer-n_layers4-hidden_size512-layer_norm_eps0.001-dropout0.9-n_attention_heads4-positional_encoding700-lr0.003-num_epochs500-bs128-seedrandom-2021-10-07T14:57:37"
+            ]
+        }
+    ],
+    "nasa-seg": [
+        {
+            "nasa_test_num": 1,
+            "paths": [
+                "./outputs/research-run-outputs/NASA-Seg.20211010-transformer-FD001/transformer-dropout0.1-layer_norm_eps1e-05-n_attention_heads2-hidden_size512-n_layers4-positional_encoding700-lr0.003-bs128-num_epochs500-seed14682599077633313808-2021-10-11T08:23:26",
+                "./outputs/research-run-outputs/NASA-Seg.20211010-transformer-FD001/transformer-dropout0.1-layer_norm_eps1e-05-n_attention_heads2-hidden_size128-n_layers4-positional_encoding700-lr0.003-bs128-num_epochs500-seed14682599077633313808-2021-10-11T05:46:02",
+                "./outputs/research-run-outputs/NASA-Seg.20211010-transformer-FD001/transformer-dropout0.1-layer_norm_eps1e-05-n_attention_heads2-hidden_size128-n_layers4-positional_encoding700-lr0.01-bs128-num_epochs500-seed14682599077633313808-2021-10-11T05:37:09"
+            ]
+        },
+        {
+            "nasa_test_num": 2,
+            "paths": [
+                "./outputs/research-run-outputs/NASA-Seg.20211011-transformer-FD002-ablative/transformer-dropout0.1-hidden_size1024-n_attention_heads3-n_layers4-layer_norm_eps1e-05-positional_encoding700-lr0.003-num_epochs200-bs32-seedrandom-2021-10-11T16:14:28",
+                "./outputs/research-run-outputs/NASA-Seg.20211011-transformer-FD002-ablative/transformer-n_layers4-dropout0.1-hidden_size256-n_attention_heads4-layer_norm_eps0.0001-lr0.03-num_epochs100-bs64-seedrandom-2021-10-12T13:25:36",
+                "./outputs/research-run-outputs/NASA-Seg.20211011-transformer-FD002-ablative/transformer-n_layers4-dropout0.1-hidden_size128-n_attention_heads4-layer_norm_eps0.001-lr0.03-num_epochs100-bs64-seedrandom-2021-10-12T10:20:43"
+            ]
+        },
+        {
+            "nasa_test_num": 3,
+            "paths": [
+                "./outputs/research-run-outputs/NASA-Seg-FD003/transformer-n_attention_heads4-dropout0.1-layer_norm_eps0.001-n_layers4-hidden_size512-positional_encoding700-lr0.03-bs32-num_epochs50-seedrandom-2021-10-09T07:42:33",
+                "./outputs/research-run-outputs/NASA-Seg-FD003/transformer-n_attention_heads2-dropout0.1-layer_norm_eps0.001-n_layers2-hidden_size128-positional_encoding700-lr0.03-bs32-num_epochs50-seedrandom-2021-10-09T04:13:12",
+                "./outputs/research-run-outputs/NASA-Seg-FD003/transformer-n_attention_heads4-dropout0.1-layer_norm_eps0.001-n_layers4-hidden_size128-positional_encoding700-lr0.03-bs32-num_epochs50-seedrandom-2021-10-09T05:36:36"
+            ]
+        },
+        {
+            "nasa_test_num": 4,
+            "paths": [
+                "./outputs/research-run-outputs/NASA-Seg.20211010-transformer-FD004/transformer-n_attention_heads4-dropout0.1-n_layers2-hidden_size128-layer_norm_eps1e-05-positional_encoding700-lr0.01-bs16-num_epochs100-seedrandom-2021-10-10T03:45:13",
+                "./outputs/research-run-outputs/NASA-Seg.20211010-transformer-FD004/transformer-n_attention_heads4-dropout0.1-n_layers2-hidden_size128-layer_norm_eps0.001-positional_encoding700-lr0.01-bs16-num_epochs100-seedrandom-2021-10-10T04:13:49",
+                "./outputs/research-run-outputs/NASA-Seg.20211010-transformer-FD004/transformer-n_attention_heads2-dropout0.1-n_layers4-hidden_size512-layer_norm_eps0.001-positional_encoding600-lr0.01-bs32-num_epochs100-seedrandom-2021-10-10T20:49:31"
+            ]
+        }
+    ],
+    "nasa": [
+        {
+            "paths": [
+                "./outputs/research-run-outputs/NASA.20211011-transformer-improvements/transformer-n_layers2-dropout0.5-n_attention_heads2-layer_norm_eps1e-05-hidden_size128-positional_encoding1000-lr0.0003-num_epochs1000-bs128-seed1123705791327780546-2021-10-10T17:45:38",
+                "./outputs/research-run-outputs/NASA.20211011-transformer-improvements/transformer-n_layers2-dropout0.5-n_attention_heads4-layer_norm_eps1e-05-hidden_size128-positional_encoding1000-lr0.0003-num_epochs1000-bs128-seed1123705791327780546-2021-10-10T21:48:35",
+                "./outputs/research-run-outputs/NASA.20211011-transformer-improvements/transformer-n_layers4-dropout0.5-n_attention_heads2-layer_norm_eps1e-05-hidden_size64-positional_encoding1000-lr0.0003-num_epochs1000-bs128-seed1123705791327780546-2021-10-10T11:27:10"
+            ]
+        }
+    ]
+}

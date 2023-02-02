@@ -1,0 +1,481 @@
+{
+    "configurations": [
+        {
+            "name": "0th-best-NASA-Seg-FD001",
+            "model": {
+                "hidden_size": 512,
+                "n_attention_heads": 2,
+                "layer_norm_epsilon": 1e-05,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 1
+            },
+            "optimizer": {
+                "lr": 0.003
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "1th-best-NASA-Seg-FD001",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 2,
+                "layer_norm_epsilon": 1e-05,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 1
+            },
+            "optimizer": {
+                "lr": 0.003
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "2th-best-NASA-Seg-FD001",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 2,
+                "layer_norm_epsilon": 1e-05,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 1
+            },
+            "optimizer": {
+                "lr": 0.01
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "0th-best-NASA-Seg-FD002",
+            "model": {
+                "hidden_size": 1024,
+                "n_attention_heads": 3,
+                "layer_norm_epsilon": 1e-05,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 2
+            },
+            "optimizer": {
+                "lr": 0.003
+            },
+            "training": {
+                "batch_size": 32,
+                "num_epochs": 200
+            }
+        },
+        {
+            "name": "1th-best-NASA-Seg-FD002",
+            "model": {
+                "hidden_size": 256,
+                "n_attention_heads": 4,
+                "layer_norm_epsilon": 0.0001,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 2
+            },
+            "optimizer": {
+                "lr": 0.03
+            },
+            "training": {
+                "batch_size": 64,
+                "num_epochs": 100
+            }
+        },
+        {
+            "name": "2th-best-NASA-Seg-FD002",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 4,
+                "layer_norm_epsilon": 0.001,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 2
+            },
+            "optimizer": {
+                "lr": 0.03
+            },
+            "training": {
+                "batch_size": 64,
+                "num_epochs": 100
+            }
+        },
+        {
+            "name": "0th-best-NASA-Seg-FD003",
+            "model": {
+                "hidden_size": 512,
+                "n_attention_heads": 4,
+                "layer_norm_epsilon": 0.001,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 3
+            },
+            "optimizer": {
+                "lr": 0.03
+            },
+            "training": {
+                "batch_size": 32,
+                "num_epochs": 50
+            }
+        },
+        {
+            "name": "1th-best-NASA-Seg-FD003",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 2,
+                "layer_norm_epsilon": 0.001,
+                "dropout": 0.1,
+                "n_layers": 2,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 3
+            },
+            "optimizer": {
+                "lr": 0.03
+            },
+            "training": {
+                "batch_size": 32,
+                "num_epochs": 50
+            }
+        },
+        {
+            "name": "2th-best-NASA-Seg-FD003",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 4,
+                "layer_norm_epsilon": 0.001,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 3
+            },
+            "optimizer": {
+                "lr": 0.03
+            },
+            "training": {
+                "batch_size": 32,
+                "num_epochs": 50
+            }
+        },
+        {
+            "name": "0th-best-NASA-Seg-FD004",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 4,
+                "layer_norm_epsilon": 1e-05,
+                "dropout": 0.1,
+                "n_layers": 2,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 4
+            },
+            "optimizer": {
+                "lr": 0.01
+            },
+            "training": {
+                "batch_size": 16,
+                "num_epochs": 100
+            }
+        },
+        {
+            "name": "1th-best-NASA-Seg-FD004",
+            "model": {
+                "hidden_size": 128,
+                "n_attention_heads": 4,
+                "layer_norm_epsilon": 0.001,
+                "dropout": 0.1,
+                "n_layers": 2,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 4
+            },
+            "optimizer": {
+                "lr": 0.01
+            },
+            "training": {
+                "batch_size": 16,
+                "num_epochs": 100
+            }
+        },
+        {
+            "name": "2th-best-NASA-Seg-FD004",
+            "model": {
+                "hidden_size": 512,
+                "n_attention_heads": 2,
+                "layer_norm_epsilon": 0.001,
+                "dropout": 0.1,
+                "n_layers": 4,
+                "positional_encoding_dimension": 600,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA-Seg",
+                "nasa_test_num": 4
+            },
+            "optimizer": {
+                "lr": 0.01
+            },
+            "training": {
+                "batch_size": 32,
+                "num_epochs": 100
+            }
+        },
+        {
+            "name": "0th-best-NASA-Agg",
+            "model": {
+                "hidden_size": 128,
+                "n_layers": 2,
+                "n_attention_heads": 2,
+                "dropout": 0.5,
+                "layer_norm_epsilon": 1e-5,
+                "positional_encoding_dimension": 1000,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA"
+            },
+            "optimizer": {
+                "lr": 3e-4
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 1000,
+                "seed": 1123705791327780546
+            }
+        },
+        {
+            "name": "1th-best-NASA-Aggg",
+            "model": {
+                "hidden_size": 128,
+                "n_layers": 2,
+                "n_attention_heads": 4,
+                "dropout": 0.5,
+                "layer_norm_epsilon": 1e-5,
+                "positional_encoding_dimension": 1000,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA"
+            },
+            "optimizer": {
+                "lr": 3e-4
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 1000,
+                "seed": 1123705791327780546
+            }
+        },
+        {
+            "name": "2th-best-NASA-Agg",
+            "model": {
+                "hidden_size": 64,
+                "n_layers": 4,
+                "n_attention_heads": 2,
+                "dropout": 0.5,
+                "layer_norm_epsilon": 1e-5,
+                "positional_encoding_dimension": 1000,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "NASA"
+            },
+            "optimizer": {
+                "lr": 3e-4
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 1000,
+                "seed": 1123705791327780546
+            }
+        },
+        {
+            "name": "0th-best-Backblaze",
+            "model": {
+                "hidden_size": 64,
+                "n_layers": 2,
+                "n_attention_heads": 2,
+                "dropout": 0.1,
+                "layer_norm_epsilon": 1e-5,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "backblaze"
+            },
+            "optimizer": {
+                "lr": 1e-2
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "1th-best-Backblaze",
+            "model": {
+                "hidden_size": 128,
+                "n_layers": 4,
+                "n_attention_heads": 4,
+                "dropout": 0.5,
+                "layer_norm_epsilon": 1e-5,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "backblaze"
+            },
+            "optimizer": {
+                "lr": 1e-2
+            },
+            "training": {
+                "batch_size": 64,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "2th-best-Backblaze",
+            "model": {
+                "hidden_size": 128,
+                "n_layers": 4,
+                "n_attention_heads": 2,
+                "dropout": 0.5,
+                "layer_norm_epsilon": 1e-3,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "backblaze"
+            },
+            "optimizer": {
+                "lr": 1e-2
+            },
+            "training": {
+                "batch_size": 64,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "0th-best-BackblazeExtended",
+            "model": {
+                "hidden_size": 1024,
+                "n_layers": 4,
+                "n_attention_heads": 4,
+                "dropout": 0.1,
+                "layer_norm_epsilon": 1e-5,
+                "positional_encoding_dimension": 300,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "backblazeextended"
+            },
+            "optimizer": {
+                "lr": 3e-3
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "1th-best-BackblazeExtended",
+            "model": {
+                "hidden_size": 1024,
+                "n_layers": 4,
+                "n_attention_heads": 4,
+                "dropout": 0.1,
+                "layer_norm_epsilon": 1e-3,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "backblazeextended"
+            },
+            "optimizer": {
+                "lr": 3e-3
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        },
+        {
+            "name": "2th-best-BackblazeExtended",
+            "model": {
+                "hidden_size": 512,
+                "n_layers": 4,
+                "n_attention_heads": 4,
+                "dropout": 0.1,
+                "layer_norm_epsilon": 1e-3,
+                "positional_encoding_dimension": 700,
+                "attention_axis": "temporal"
+            },
+            "data": {
+                "dataset_name": "backblazeextended"
+            },
+            "optimizer": {
+                "lr": 1e-2
+            },
+            "training": {
+                "batch_size": 128,
+                "num_epochs": 500
+            }
+        }
+    ]
+}

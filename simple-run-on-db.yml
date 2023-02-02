@@ -1,0 +1,45 @@
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
+
+build:
+  no_build: true
+environments:
+  dbx-providence-exp-01:
+    workflows:
+      - name: "torch-test"
+        spark_python_task:
+          python_file: "file://torchtest.py"
+      - name: "metrics-iteration"
+        spark_python_task:
+          python_file: "file://experiments/databricks/drafting_better_metrics.py"
+      - name: "file-pack-test"
+        spark_python_task:
+          python_file: "file://experiments/databricks/file_packing_test.py"
+      - name: "lr-finder"
+        spark_python_task:
+          python_file: "file://experiments/databricks/LearningRateFinder.py"
+      - name: "deepmind-trial"
+        spark_python_task:
+          python_file: "file://experiments/databricks/deepmind_with_lr_finder.py"
+      - name: "mse-trial"
+        spark_python_task:
+          python_file: "file://experiments/databricks/MSE_loss_check.py"
+      - name: "attention-axis-exp"
+        spark_python_task:
+          python_file: "file://experiments/databricks/attention_axis_assessment.py"
+      - name: "attention-axis-exp-legacy"
+        spark_python_task:
+          python_file: "file://experiments/databricks/axial_attention.py"
+      - name: "horovod-test"
+        spark_python_task:
+          python_file: "file://scripts/db_horovod_train.py"
+      - name: "horovod-gru"
+        spark_python_task:
+          python_file: "file://experiments/databricks/gru_horovod_sweep.py"
+
+      - name: "gru-nasa-reproducibility"
+        spark_python_task:
+          python_file: "file://experiments/databricks/hybrid sweep - GRU NASA redux.py"
+      - name: "transformer-nasa"
+        spark_python_task:
+          python_file: "file://experiments/databricks/hybrid sweep - Transformer NASA redux.py"
