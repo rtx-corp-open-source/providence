@@ -1,0 +1,11 @@
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
+
+torch>=1.7.0
+torchvision
+numpy
+pandas>=1.0.0
+progressbar2 # a better progress bar than tqdm
+pyarrow
+typer
+lifelines==0.26.*

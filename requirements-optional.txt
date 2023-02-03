@@ -1,0 +1,9 @@
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
+
+dx-rotor-plot<=1.0.0
+
+# optional, but paired visualization dependencies
+matplotlib~=3.3.4
+seaborn~=0.11.1
+pyarrow

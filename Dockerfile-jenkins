@@ -1,0 +1,82 @@
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
+FROM ubuntu:19.10
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV https_proxy ${HTTPS_PROXY}
+ENV http_proxy ${HTTP_PROXY}
+ENV no_proxy ${NO_PROXY}
+
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+RUN apt-get update -y
+RUN apt-get -y install git make curl wget build-essential libffi-dev libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+ libsqlite3-dev llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev
+RUN apt-get -y install python3 python3-pip zip unzip
+RUN apt-get -y install python3 python3-pip
+
+RUN apt-get install -y software-properties-common
+RUN add-apt-repository universe
+RUN add-apt-repository main
+RUN apt-get update
+RUN apt-get -y install gcc libatlas-base-dev liblapack-dev libblas-dev
+
+COPY pip.conf /
+ENV PIP_CONFIG_FILE /pip.conf
+
+RUN python3 -m pip install --upgrade setuptools
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade wheel
+RUN git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+
+ENV PYENV_ROOT="/root/.pyenv"
+ENV PATH="$PYENV_ROOT/bin:$PATH"
+RUN eval "$(pyenv init -)"
+RUN pyenv install --verbose 3.7.2
+RUN pyenv install --verbose 3.6.8
+RUN pyenv install --verbose 3.5.6
+RUN pyenv local 3.7.2 3.6.8 3.5.6
+
+# Install Sonar Scanner
+ENV SONAR_SCANNER_VERSION=4.2.0.1873
+RUN curl -LO \
+  https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip \
+  && unzip sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip -d sonar-scanner \
+  && rm -fr sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip \
+  && cp -r sonar-scanner /opt/sonar-scanner \
+  && chmod -R +x sonar-scanner \
+  && ln -s -f /opt/sonar-scanner/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin/sonar-scanner /usr/local/bin/. \
+  && ln -s -f /opt/sonar-scanner/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/jre/bin/java /usr/local/bin/.
+
+RUN addgroup --gid 1000 jenkins
+RUN useradd -u 1000 -g 1000 --home /home/jenkins --shell /bin/bash jenkins --no-create-home
+RUN usermod -aG jenkins root \
+    && mkdir -p /home/jenkins
+
+RUN echo "jenkins ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# copy the files we need
+COPY requirements.txt ./requirements.txt
+COPY requirements-dev.txt ./requirements-dev.txt
+
+# install dependencies
+RUN python3 -m pip install -r requirements-dev.txt
+RUN python3 -m pip install -r requirements.txt
+
+# copy the rest
+#COPY . /providence
+#WORKDIR /providence
+
+# Run testing in Python
+RUN python3 -m pip install tox tox-pyenv pytest-cov coverage pytest-html  pytest-benchmark elasticsearch pytest-benchmark[histogram] pygal pygaljs
+
+ENV PATH="/home/jenkins/.local/bin:/usr/local/bin:$PATH"
+
+RUN chown jenkins:jenkins -R /home/jenkins
+
+USER jenkins
