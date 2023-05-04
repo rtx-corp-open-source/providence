@@ -6,39 +6,65 @@ Export controlled - see license file
 """
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TypedDict
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import TypedDict
 
 import torch
 import typer
-from pandas import Series, concat
+from pandas import concat
+from pandas import Series
 from progressbar import progressbar
+from torch.optim import SGD
+
 from providence.dataloaders import CustomProvidenceDataloaders
-from providence.datasets import (
-    BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER, BackblazeDataset, BackblazeDatasets, BackblazeExtendedDataset,
-    BackblazeExtendedDatasets, DataSubsetId, NasaDataset, NasaDatasets, NasaFD00XDataset, NasaFD00XDatasets,
-    ProvidenceDataset
-)
-from providence.datasets.adapters import BackblazeQuarter, NasaTurbofanTest
+from providence.datasets import BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER
+from providence.datasets import BackblazeDataset
+from providence.datasets import BackblazeDatasets
+from providence.datasets import BackblazeExtendedDataset
+from providence.datasets import BackblazeExtendedDatasets
+from providence.datasets import DataSubsetId
+from providence.datasets import NasaDataset
+from providence.datasets import NasaDatasets
+from providence.datasets import NasaFD00XDataset
+from providence.datasets import NasaFD00XDatasets
+from providence.datasets import ProvidenceDataset
+from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets.adapters import NasaTurbofanTest
 from providence.distributions import Weibull
 from providence.metrics import fleet_metrics
 from providence.nn import ProvidenceTransformer
 from providence.nn.transformer.transformer import set_attention_axis
-from providence.training import LossAggregates, OptimizerWrapper, minimize_torch_runtime_overhead, use_gpu_if_available
+from providence.training import LossAggregates
+from providence.training import minimize_torch_runtime_overhead
+from providence.training import OptimizerWrapper
+from providence.training import use_gpu_if_available
 from providence.types import DataLoaders
-from providence.utils import configure_logger_in_dir, now_dt_string, set_seed
-from providence_utils.callbacks import (
-    CachedIntervalMetricsVisualizer, Callback, EarlyStopping, ModelCheckpointer, WriteModelOutputs
-)
+from providence.utils import configure_logger_in_dir
+from providence.utils import now_dt_string
+from providence.utils import set_seed
+from providence_utils.callbacks import CachedIntervalMetricsVisualizer
+from providence_utils.callbacks import Callback
+from providence_utils.callbacks import EarlyStopping
+from providence_utils.callbacks import ModelCheckpointer
+from providence_utils.callbacks import WriteModelOutputs
 from providence_utils.hyperparameter_sweeper import Hyperparameter
-from providence_utils.trainer import Trainer, transformer_epoch
-from torch.optim import SGD
+from providence_utils.trainer import Trainer
+from providence_utils.trainer import transformer_epoch
 
 
 def relative_file(fpath: str) -> str:
     return (Path(__file__).parent / fpath).as_posix()
 
 
-def callback_training(model, optimizer: OptimizerWrapper, dataloaders: DataLoaders, cbs: List[Callback] = None):
+def callback_training(
+    model,
+    optimizer: OptimizerWrapper,
+    dataloaders: DataLoaders,
+    cbs: List[Callback] = None,
+):
     trainer = Trainer(transformer_epoch, verbose=True)
     loss_agg = trainer.callback_training(model, optimizer, dataloaders, cbs)
     return loss_agg
@@ -58,14 +84,13 @@ def compute_loss_metrics(losses: LossAggregates) -> Series:
             "loss_val_min": np.nanmin(losses.validation_losses),
             "loss_val_final": losses.validation_losses[-1],
         },
-        name="loss_metric"
+        name="loss_metric",
     )
 
 
-def datasets_for_experiment_1_config(data_config: dict,
-                                     *,
-                                     seed: int = 1234,
-                                     data_root: str = "./.data") -> Tuple[ProvidenceDataset, ProvidenceDataset]:
+def datasets_for_experiment_1_config(
+    data_config: dict, *, seed: int = 1234, data_root: str = "./.data"
+) -> Tuple[ProvidenceDataset, ProvidenceDataset]:
     dataset_name = data_config["name"]
     if equals_ignorecase(dataset_name, "NasaSub"):
         return NasaFD00XDatasets(NasaTurbofanTest(data_config["nasa_test_num"]), data_root=data_root)
@@ -75,7 +100,10 @@ def datasets_for_experiment_1_config(data_config: dict,
         return BackblazeDatasets(quarter=BackblazeQuarter._2019_Q4, random_seed=seed, data_root=data_root)
     elif equals_ignorecase(dataset_name, "BackblazeExtended"):
         return BackblazeExtendedDatasets(
-            *BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER, include_validation=False, random_seed=seed, data_root=data_root
+            *BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER,
+            include_validation=False,
+            random_seed=seed,
+            data_root=data_root,
         )
     else:
         raise ValueError(f"{dataset_name=} not supported")
@@ -87,7 +115,8 @@ def equals_ignorecase(s1: str, s2: str) -> bool:
 
 class ExperimentTaskDefinition(TypedDict):
     """This type encapsulate the sub run for which a plurality of completions constitue a full experiment.
-    In other words, an Experiment is composed of many tasks and this outlines one of those task"""
+    In other words, an Experiment is composed of many tasks and this outlines one of those task
+    """
 
     name: Optional[str]
     dataset: Dict[str, Hyperparameter]
@@ -96,8 +125,9 @@ class ExperimentTaskDefinition(TypedDict):
     training: TypedDict("training_params", {"batch_size": int, "num_epochs": int})
 
 
-_EXPERIMENT_1_CONFIGS: List[ExperimentTaskDefinition] = json.load(open(relative_file("configs/experiment-001.json"))
-                                                                 )["configurations"]
+_EXPERIMENT_1_CONFIGS: List[ExperimentTaskDefinition] = json.load(open(relative_file("configs/experiment-001.json")))[
+    "configurations"
+]
 
 
 def experiment_1__top_configurations_per_model(
@@ -105,7 +135,7 @@ def experiment_1__top_configurations_per_model(
     *,
     data_root: str = "./.data",
     experiment_configurations=_EXPERIMENT_1_CONFIGS,
-    with_early_stopping=False
+    with_early_stopping=False,
 ):
     """Top 3 configurations for each model, for each dataset, retrain with each attentional axis"""
     output_root.mkdir(parents=True, exist_ok=True)
@@ -131,12 +161,17 @@ def experiment_1__top_configurations_per_model(
             model.device = use_gpu_if_available()
             optimizer = SGD(model.parameters(), lr=experiment_config["optimizer"]["lr"])
             optimizer = OptimizerWrapper(
-                optimizer, batch_size=training_config["batch_size"], num_epochs=training_config["num_epochs"]
+                optimizer,
+                batch_size=training_config["batch_size"],
+                num_epochs=training_config["num_epochs"],
             )
             dls = CustomProvidenceDataloaders(train_ds, test_ds, batch_size=optimizer.batch_size)
 
             run_output_dir = Path(
-                output_root, attention_type, experiment_config["data"]["name"], experiment_config["name"]
+                output_root,
+                attention_type,
+                experiment_config["data"]["name"],
+                experiment_config["name"],
             )
             run_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -163,7 +198,7 @@ def experiment_1__top_configurations_per_model(
                 attention_type=attention_type,
                 experiment_num=experiment_num,
                 run_name=experiment_config["name"],
-                ds_name=experiment_config["data"]["name"]
+                ds_name=experiment_config["data"]["name"],
             )
             for loss_metric, measure in loss_metrics.items():
                 m[loss_metric] = measure
@@ -179,12 +214,18 @@ def dataset_for_experiment_2(dataset_name: str, nasa_test_num: int = None, *, da
     if equals_ignorecase(dataset_name, "nasa"):
         return NasaDataset(subset_choice=DataSubsetId.Test, data_dir=data_root)
     if equals_ignorecase(dataset_name, "nasa-seg"):
-        return NasaFD00XDataset(NasaTurbofanTest(nasa_test_num), subset_choice=DataSubsetId.Test, data_dir=data_root)
+        return NasaFD00XDataset(
+            NasaTurbofanTest(nasa_test_num),
+            subset_choice=DataSubsetId.Test,
+            data_dir=data_root,
+        )
     if equals_ignorecase(dataset_name, "Backblaze"):
         return BackblazeDataset(DataSubsetId.Test, data_dir=data_root)
     if equals_ignorecase(dataset_name, "BackblazeExtended"):
         return BackblazeExtendedDataset(
-            *BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER, subset_choice=DataSubsetId.Test, data_root=data_root
+            *BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER,
+            subset_choice=DataSubsetId.Test,
+            data_root=data_root,
         )
     raise ValueError(f"Invalid arguments: {dataset_name=} {nasa_test_num=}")
 
@@ -215,7 +256,7 @@ def experiment_2__best_models_switching_attentional_axis(output_root: Path, *, d
 
         assert isinstance(configurations, list)
         # We should only have plural configurations for the nasa-seg datasets. Everything else should be a singleton
-        assert (len(configurations) > 1) == (ds_name == 'nasa-seg'), f"{len(configurations) =} but {ds_name = }"
+        assert (len(configurations) > 1) == (ds_name == "nasa-seg"), f"{len(configurations) =} but {ds_name = }"
 
         for config_num, config in enumerate(configurations, 1):
             print("Config", config_num, f"{config}")
@@ -224,14 +265,16 @@ def experiment_2__best_models_switching_attentional_axis(output_root: Path, *, d
 
             for path_num, model_root in enumerate(progressbar(best_models_on_ds, max_len=len(best_models_on_ds)), 1):
                 for model_path in Path(model_root).glob("*.pt"):
-                    model = torch.load(model_path, map_location='cpu')
+                    model = torch.load(model_path, map_location="cpu")
                     temporal_metrics = fleet_metrics(model, Weibull, val_ds).assign(
-                        exec_id=f"{ds_name}_{config_num}_{path_num}", attention_axis="temporal"
+                        exec_id=f"{ds_name}_{config_num}_{path_num}",
+                        attention_axis="temporal",
                     )
 
                     set_attention_axis(model.transformer, "feature")
                     feature_metrics = fleet_metrics(model, Weibull, val_ds).assign(
-                        exec_id=f"{ds_name}_{config_num}_{path_num}", attention_axis="feature"
+                        exec_id=f"{ds_name}_{config_num}_{path_num}",
+                        attention_axis="feature",
                     )
 
                     metrics_to_compare = concat((temporal_metrics, feature_metrics), ignore_index=True)
@@ -253,5 +296,5 @@ def main(experiment_num: int = typer.Argument(..., help="experiment number", min
         experiment_2__best_models_switching_attentional_axis(run_output_dir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     typer.run(main)

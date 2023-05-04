@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Implemented `mypy` static type checking and flake8 , initial run of black.
+- Setup pre-commit.
+- Used `jaxtyping` to better support `mypy` static type checking.
+  - `providence.distribution` Distributions instantiation is now required to comply with `mypy`.
+
+### Added
+- `.pre-commit-config.yaml`
+- `pyproject.toml`
+- `mypy.ini`
 
 ## [1.0.post1.dev7] - 2023-01-23
 ### Added

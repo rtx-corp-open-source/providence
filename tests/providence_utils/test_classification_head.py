@@ -4,9 +4,11 @@ Export controlled - see license file
 """
 import torch as pt
 
-from providence.nn import ProvidenceGRU, ProvidenceTransformer
+from providence.nn import ProvidenceGRU
+from providence.nn import ProvidenceTransformer
 from providence.nn.rnn import providence_rnn_infer
-from providence.nn.transformer.transformer import MultiheadedAttention2, MultiheadedAttention3
+from providence.nn.transformer.transformer import MultiheadedAttention2
+from providence.nn.transformer.transformer import MultiheadedAttention3
 from providence.nn.transformer.utils import make_bit_masking_tensor
 from providence_utils.model_output_heads import ClassificationHead
 
@@ -28,7 +30,7 @@ def test_classification_probability_axioms_hold():
     output = m(examples)[0]
 
     assert (output >= 0).all(), "Probabilities should all be non-negative"
-    assert pt.allclose(pt.tensor(1.), output.sum()), "Probabilities should sum to 1"
+    assert pt.allclose(pt.tensor(1.0), output.sum()), "Probabilities should sum to 1"
 
 
 def test_classification_probability_axioms_hold__many_examples():
@@ -40,14 +42,14 @@ def test_classification_probability_axioms_hold__many_examples():
 
     assert_quasiprobability_axioms(output)
 
-    true = pt.tensor([0, 0, 1., 0]).tile(examples.size(0), 1)  # go from Size((4,)) to Size((5, 4))
+    true = pt.tensor([0, 0, 1.0, 0]).tile(examples.size(0), 1)  # go from Size((4,)) to Size((5, 4))
     pt.nn.CrossEntropyLoss()(output, true).backward()
     assert True, "Should be able to do a backward pass"
 
 
 def assert_quasiprobability_axioms(output):
     assert (output >= 0).all().all(), "Probabilities should all be non-negative"
-    assert pt.allclose(pt.tensor(1.), output.sum(dim=-1)), "Probabilities should sum to 1"
+    assert pt.allclose(pt.tensor(1.0), output.sum(dim=-1)), "Probabilities should sum to 1"
 
 
 def test_demo_classification_head_in_simple_model():
@@ -84,13 +86,17 @@ class TestRawOutputBasedClassifier:
         classifier = ClassificationHead(n_classes=4)
 
         predictions = classifier(rnn_outputs)
-        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes, ))
+        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes,))
         assert_quasiprobability_axioms(predictions)
 
     def test_demo_classification_head_in_providence_transformer_model(self):
         example_features = 3
         m = ProvidenceTransformer(
-            example_features, hidden_size=10, n_layers=1, n_attention_heads=1, t_attention=MultiheadedAttention3
+            example_features,
+            hidden_size=10,
+            n_layers=1,
+            n_attention_heads=1,
+            t_attention=MultiheadedAttention3,
         )
 
         x_lengths = [12, 5, 6, 9, 3]  # randomly generated.
@@ -102,7 +108,7 @@ class TestRawOutputBasedClassifier:
         classifier = ClassificationHead(n_classes=4)
 
         predictions = classifier(transformer_outputs)
-        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes, ))
+        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes,))
         assert_quasiprobability_axioms(predictions)
 
 
@@ -119,7 +125,7 @@ class TestEmbeddingBasedClassifier:
         classifier = ClassificationHead(n_classes=4)
 
         predictions = classifier(rnn_outputs)
-        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes, ))
+        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes,))
         assert_quasiprobability_axioms(predictions)
 
         true = helper_test_binary_labels(examples, classifier.n_classes)
@@ -130,7 +136,11 @@ class TestEmbeddingBasedClassifier:
     def test_demo_classification_head_in_providence_transformer_model(self):
         example_features = 3
         m = ProvidenceTransformer(
-            example_features, hidden_size=10, n_layers=1, n_attention_heads=1, t_attention=MultiheadedAttention2
+            example_features,
+            hidden_size=10,
+            n_layers=1,
+            n_attention_heads=1,
+            t_attention=MultiheadedAttention2,
         )
 
         x_lengths = [12, 5, 6, 9, 3]  # randomly generated.
@@ -143,7 +153,7 @@ class TestEmbeddingBasedClassifier:
         classifier = ClassificationHead(n_classes=4)
 
         predictions = classifier(transformer_output_embedding)
-        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes, ))
+        assert predictions.size() == pt.Size(examples.shape[1:2] + (classifier.n_classes,))
         assert_quasiprobability_axioms(predictions)
 
         true = helper_test_binary_labels(examples, classifier.n_classes)

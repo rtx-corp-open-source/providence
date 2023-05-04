@@ -16,13 +16,15 @@ from typing import Callable
 import torch
 from matplotlib import pyplot as plt
 from progressbar.shortcuts import progressbar
-from torch import nn, optim
+from torch import nn
+from torch import optim
 from torch.utils.data import dataset
 from torch.utils.data.dataloader import DataLoader
 
 from providence.dataloaders import ProvidenceDataLoader
-from providence.datasets import BackblazeDataset, BackblazeExtendedDataset
-from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets import BackblazeDataset
+from providence.datasets import BackblazeExtendedDataset  # noqa F401
+from providence.datasets.adapters import BackblazeQuarter  # noqa F401
 from providence.loss import discrete_weibull_loss_fn as providence_loss
 from providence.nn import ProvidenceTransformer
 from providence.training import unpack_label_and_censor
@@ -38,7 +40,7 @@ class ProvidenceLearningRateFinder:
         train_dataloader: DataLoader,
         model_name: str = None,
         *,
-        verbose: bool = False
+        verbose: bool = False,
     ):
         self.net_factory = net_factory
         self.opt_factory = opt_factory
@@ -92,7 +94,7 @@ class ProvidenceLearningRateFinder:
             avg_loss = learning_beta * avg_loss + ((1 - learning_beta) * loss.item())
             self.log(f"{avg_loss = }")
 
-            smoothed_loss = avg_loss / (1 - learning_beta ** batch_num)
+            smoothed_loss = avg_loss / (1 - learning_beta**batch_num)
             self.log(f"{smoothed_loss = }")
             should_exit = torch.isnan(loss) or torch.isnan(torch.tensor(smoothed_loss))
 
@@ -132,7 +134,15 @@ class ProvidenceLearningRateFinder:
 # n_layers = 4 is genuinely more stable
 
 if __name__ == "__main__":
-    hyperparameters = {"bs": 64, "hidden_size": 64, "n_layers": 4, "n_attention_heads": 4, "dropout": 0.0, "cycles": 3, "easy-mode": True}
+    hyperparameters = {
+        "bs": 64,
+        "hidden_size": 64,
+        "n_layers": 4,
+        "n_attention_heads": 4,
+        "dropout": 0.0,
+        "cycles": 3,
+        "easy-mode": True,
+    }
     # train_data = BackblazeExtendedDataset(quarters_for_download=BackblazeExtendedDataset.quarters_for_paper, train=True, failures_only=hyperparameters["easy-mode"])
     train_data = dataset.ConcatDataset([BackblazeDataset()] * hyperparameters["cycles"])
 

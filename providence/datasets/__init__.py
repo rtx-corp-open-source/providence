@@ -25,11 +25,10 @@ Anyone working with just the helper functions could follow a similar pattern to 
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
+# flake8: noqa
 from . import *
-
 from .adapters import *
-from .backblaze import *
+from .backblaze import *  # type: ignore[assignment, misc]
 from .core import *
 from .nasa import *
 from .utils import *

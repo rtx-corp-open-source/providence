@@ -5,10 +5,17 @@ The HyperparameterSweeper and supporting types that make it easier to do a contr
 Export controlled - see license file
 """
 from itertools import product
-from providence_utils.merge_dict import merge_dictionaries
-from typing import Callable, Dict, List, Mapping, Union
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Mapping
+from typing import Union
 
 from progressbar import progressbar
+from providence.utils import validate
+
+from providence_utils.merge_dict import merge_dictionaries
 
 
 Hyperparameter = Union[str, int, float]
@@ -17,11 +24,21 @@ TrainingParams = Dict[str, Hyperparameter]
 Metrics = Dict[str, float]
 
 
+def nest_values(d: Mapping, *, sep: str = ".", signal: str = "no_iter", verbose: bool = False) -> dict:
+    """Unnest the keys of a flatten (depth of 1) dictionary into a nested dictionary.
 
-def nest_values(d: dict, *, sep: str = ".", signal: str = "no_iter", verbose: bool = False) -> dict:
-    """Unnest the keys of a flatten (depth of 1) dictionary into a nested dictionary
-    Supply `signal` (with any value) at the depth that you do not want recursed on
+    Supply ``signal`` (with any value) at the depth that you do not want recursed on
 
+    Args:
+        d (Mapping): dictionary-like object with nested keys (see examples)
+        sep (str, optional): Value that seperates semantic keys in ``d``. Defaults to ".".
+        signal (str, optional): Value to indicate that no further nesting should occur. Defaults to "no_iter".
+        verbose (bool, optional): Defalts to False.
+
+    Returns:
+        dict: nesting each key found after seperating ``sep`` in ``d``.
+
+    Examples:
     >>> nest_values({"a.b": 1})
     {"a": {"b": 1}}
 
@@ -31,12 +48,12 @@ def nest_values(d: dict, *, sep: str = ".", signal: str = "no_iter", verbose: bo
     >>> {"a.b.c": 1, "a.b.d": 2}
     {"a": {"b": {"c": 1, "d": 2}}}
     """
-    assert all(map(lambda x: isinstance(x, str), d.keys())), "Can only unnest str keys"
+    validate(all(map(lambda x: isinstance(x, str), d.keys())), "Can only unnest str keys")
     # TODO(stephen): deep copy on the values. Keys are creation (as they are strings on the heap)
     if signal in d:
-        return d
+        return dict(d)
 
-    output = dict()
+    output: Dict[Any, Any] = dict()
     for k, v in d.items():
         if sep in k:
             top_level, rest = k.split(sep, 1)
@@ -50,11 +67,19 @@ def nest_values(d: dict, *, sep: str = ".", signal: str = "no_iter", verbose: bo
     return output
 
 
-def nest_keys(d: dict, *, sep: str = ".", signal: str = "no_iter") -> dict:
-    """
-    Nest the keys of a nested dictionary and flattens it into a depth-of-1 dictionary
-    Much more like a depth-first search in implementation
+def nest_keys(d: Mapping, *, sep: str = ".", signal: str = "no_iter") -> dict:
+    """Nest the keys of a nested dictionary and flattens it into a depth-of-1 dictionary.
 
+    Args:
+        d (Mapping): dict with keys that have Mappings for values, which aught to be nested.
+        sep (str, optional): value to seperate keys, post-nesting. Defaults to "."
+        signal (str, optional): indicator to not attempt to unnest the given dictionary. For convenience in
+            ``HyperparameterSweeper``, we wrap such "stop dicts" in an array. Defaults to "no_iter".
+
+    Returns:
+        dict: depth-of-1 dictionary
+
+    Examples:
     >>> nest_keys({"a": {"b": {"c": 1}}})
     {"a.b.c": 1}
 
@@ -79,25 +104,47 @@ def nest_keys(d: dict, *, sep: str = ".", signal: str = "no_iter") -> dict:
 
 
 class HyperparameterSweeper:
-    """
-    A supportive tool to iterate all combinations of supplied hyperparameters, invoking a training
-    loop with a given configuration and (optionally) producing a report.
+    """GridSearch over all combinations of supplied hyperparameters.
 
+    This can also invoke a training loop with a given configuration (i.e. "cell" in the "grid") and produce a report.
     Name is an homage to Weights&Biases hyperparameter tuning toolkit (see: https://docs.wandb.ai/guides/sweeps)
+
+    Args:
+        hyperparams: key=value pairs, where
+            key (str): name for the value
+            value (HyperparameterList): hyperparameter values to try
     """
+
     @classmethod
-    def from_dict(cls, dict_of_hyperparams: Dict[str, HyperparameterList]) -> 'HyperparameterSweeper':
+    def from_dict(cls, dict_of_hyperparams: Mapping[str, HyperparameterList]) -> "HyperparameterSweeper":
+        """Construct an instance from a pre-written ``Mapping``.
+
+        One would use this over the constructor if your keys aren't valid keyword arguments e.g. "run-limit"
+        or "search-depth"
+
+        Args:
+            dict_of_hyperparams:
+
+        Returns:
+            HyperparameterSweeper: instance
+        """
         return cls(**dict_of_hyperparams)
 
-    def __init__(self, **hyperparams: Dict[str, HyperparameterList]):
+    def __init__(self, **hyperparams: HyperparameterList):
         self.hyperparameters = hyperparams
 
     def poll_sweeps(self):
-        """
-        Iterates the product of the sweeps
-        - Upon encountering a list, we interpret this as a list of parameters
-        - Upon encountering a dict, we iterate the keys. This is probably not desired functionality, so we recomend flattening
-          dictionaries and unfolding the values on the dictionary into the top-level.
+        """Iterate the product of the sweeps.
+
+        Upon encountering a list, we interpret this as a list of parameters
+        Upon encountering a dict, we iterate the keys. This is probably not desired functionality, so we recomend
+        flattening dictionaries and unfolding the values on the dictionary into the top-level.
+        We facilitate this behavior with the ``nest_keys``
+        TODO(stephen): take aadditional arguments, as ``nest_keys_kwargs``
+
+        Generates:
+            dict: nested values, fully hierarchical dictionary, mirroring the structure given at sweeper construction,
+                only replacing the lists of values with the single values.
         """
         hparams_nested = nest_keys(self.hyperparameters)
         print("Parameters, post-nesting:", hparams_nested)
@@ -106,17 +153,22 @@ class HyperparameterSweeper:
         for configuration in product(*candidate_values):
             yield nest_values(dict(zip(config_keys, configuration)))
 
-    def sweep(self, training_loop: Callable[[TrainingParams], Metrics], with_progress_bar: bool = True) -> List[Metrics]:
-        """
-        Perform a hyperparameter sweep across the configurations produced by the hyperparameter (configuration) generator.
+    def sweep(
+        self,
+        training_loop: Callable[[TrainingParams], Metrics],
+        with_progress_bar: bool = True,
+    ) -> List[Metrics]:
+        """Perform a hyperparameter sweep across the configurations produced by the ``poll_sweep``.
+
         You supply your own callable so you can leverage your own training loop code, rather than us implement one for you.
 
         Args:
-            :param training_loop: a reference to function that leverages the configurations.
-                Returns: the returned metrics are expected to obey a schema, such that they can be tabulated, ranked and
-                        organized.
-        
-        Returns: List of metrics, corresponding to each training loop run (hopefully) based on the supplied configuration
+            training_loop (Callable[[TrainingParams], Metrics]): a reference to function that leverages the configurations.
+                Returns: the returned metrics are expected to obey a schema, such that they can be tabulated, ranked
+                and organized.
+
+        Returns:
+            List[Metrics]: metrics for each training loop run, intended to be wrt the supplied configuration
         """
 
         def prefixed_config(cfg: Dict[str, Hyperparameter]):
@@ -126,13 +178,12 @@ class HyperparameterSweeper:
         if with_progress_bar:
             itr = progressbar(itr, max_value=self._count_configurations, redirect_stdout=True)
 
-        metrics = [{**training_loop(configuration),**prefixed_config(configuration)} for configuration in itr]
+        metrics = [{**training_loop(configuration), **prefixed_config(configuration)} for configuration in itr]
         return metrics
 
     @property
     def _count_configurations(self) -> int:
-        """Compute the size of the sweeps, iteratively. DO NOT USE if your sweeps can't be iterated twice (e.g. list vs iterator)"""
+        """Compute the size of the sweeps, iteratively. DO NOT USE if your sweeps can't be iterated twice (e.g. list vs iterator)."""
         from functools import reduce
 
         return reduce(lambda x, y: x + 1, self.poll_sweeps(), 0)
-

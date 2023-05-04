@@ -5,29 +5,46 @@
 Export controlled - see license file
 """
 # COMMAND ----------
-
 # !nvidia-smi
-
 # COMMAND ----------
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Final, Tuple, Type
+from typing import Dict
+from typing import Final
+from typing import Tuple
+from typing import Type
 
 import mlflow
 import torch
-from providence.dataloaders import CustomProvidenceDataloaders, ProvidenceDataLoader
-from providence.datasets.adapters import (BACKBLAZE_FEATURE_NAMES, NASA_FEATURE_NAMES, BackblazeQuarter)
+
+from providence.dataloaders import CustomProvidenceDataloaders
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES
+from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets.adapters import NASA_FEATURE_NAMES
 from providence.datasets.backblaze import BackblazeDatasets
 from providence.nn.module import ProvidenceModule
 from providence.paper_reproductions import GeneralMetrics
-from providence.training import OptimizerWrapper, set_torch_default_dtypes, use_gpu_if_available, training_epoch
+from providence.training import OptimizerWrapper
+from providence.training import set_torch_default_dtypes
+from providence.training import training_epoch
+from providence.training import use_gpu_if_available
 from providence.types import DataLoaders
-from providence.utils import configure_logger_in_dir, multilevel_sort, now_dt_string, set_seed
-from providence_utils.callbacks import (
-    EarlyStopping, EmergencyBrake, IntervalMetricsVisualizer, LearningCurveTracker, LearningRateScheduler,
-    ModelCheckpointer, WriteModelOutputs
-)
-from providence_utils.hyperparameter_sweeper import Hyperparameter, HyperparameterList, HyperparameterSweeper, nest_keys
+from providence.utils import configure_logger_in_dir
+from providence.utils import multilevel_sort
+from providence.utils import now_dt_string
+from providence.utils import set_seed
+from providence_utils.callbacks import EarlyStopping
+from providence_utils.callbacks import EmergencyBrake
+from providence_utils.callbacks import IntervalMetricsVisualizer
+from providence_utils.callbacks import LearningCurveTracker
+from providence_utils.callbacks import LearningRateScheduler
+from providence_utils.callbacks import ModelCheckpointer
+from providence_utils.callbacks import WriteModelOutputs
+from providence_utils.hyperparameter_sweeper import Hyperparameter
+from providence_utils.hyperparameter_sweeper import HyperparameterList
+from providence_utils.hyperparameter_sweeper import HyperparameterSweeper
+from providence_utils.hyperparameter_sweeper import nest_keys
 from providence_utils.trainer import Trainer
 
 # COMMAND ----------
@@ -47,7 +64,7 @@ general_config = {
 DS_NAME_TO_FEATURE_COUNT = {
     "backblaze": len(BACKBLAZE_FEATURE_NAMES),
     "bbe": len(BACKBLAZE_FEATURE_NAMES),
-    "nasa": len(NASA_FEATURE_NAMES)
+    "nasa": len(NASA_FEATURE_NAMES),
 }
 
 # COMMAND ----------
@@ -68,7 +85,7 @@ def mlflow_epoch(dls, model, optimizer):
 
 # COMMAND ----------
 
-sum(1 for _ in Path("/dbfs/FileStore/providence-legacy-recovery/backblaze-vanilla-rnn").glob('**/*.*'))
+sum(1 for _ in Path("/dbfs/FileStore/providence-legacy-recovery/backblaze-vanilla-rnn").glob("**/*.*"))
 
 # COMMAND ----------
 
@@ -79,7 +96,7 @@ sum(1 for _ in Path("/dbfs/FileStore/providence-legacy-recovery/backblaze-vanill
 
 
 def recursive_delete(directory: Path) -> None:
-    for child in directory.glob('**/*.*'):
+    for child in directory.glob("**/*.*"):
         if child.is_dir():
             recursive_delete(child)
             child.rmdir()
@@ -120,9 +137,10 @@ train_ds, val_ds, test_ds = BackblazeDatasets(
     include_validation=metadata_to_log["data"]["use_test_set"],
     split_percentage=metadata_to_log["data"]["split_percentage"],
     data_root="/dbfs/FileStore/datasets/providence",
-    random_seed=DS_SEED
+    random_seed=DS_SEED,
 )
 metadata_to_log["data"]["name"] = "Backblaze"
+
 
 # COMMAND ----------
 def dataset_fiddling(num_workers: int = 1):
@@ -142,20 +160,33 @@ def dataset_fiddling(num_workers: int = 1):
     strat = StratifiedKFold(n_splits=4)
     indices = list(range(n_devices))
     for i_split, (train_index, test_index) in enumerate(strat.split(indices, labels)):
-        print(f"""{i_split = }
-            {test_index = }""")
+        print(
+            f"""{i_split = }
+            {test_index = }"""
+        )
 
         train_subsampler = SubsetRandomSampler(train_index)
         validation_subsampler = SubsetRandomSampler(test_index)
         full_ds = train_ds + val_ds + test_ds
         train_dl = ProvidenceDataLoader(full_ds, pin_memory=True, num_workers=num_workers, sampler=train_subsampler)
-        validation_dl = ProvidenceDataLoader(full_ds, pin_memory=True, num_workers=num_workers, sampler=validation_subsampler)
+        validation_dl = ProvidenceDataLoader(
+            full_ds,
+            pin_memory=True,
+            num_workers=num_workers,
+            sampler=validation_subsampler,
+        )
         dls = DataLoaders(train_dl, validation_dl, test=validation_dl)
+
 
 # COMMAND ----------
 dls = CustomProvidenceDataloaders(
-    train_ds, val_ds, batch_size=general_config["batch_size"], pin_memory=True, num_workers=1
+    train_ds,
+    val_ds,
+    batch_size=general_config["batch_size"],
+    pin_memory=True,
+    num_workers=1,
 )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1))
+
 
 # COMMAND ----------
 def try_log_artifacts(output_dir: Path):
@@ -189,8 +220,12 @@ def optimizer_default_config() -> dict:
 
 # COMMAND ----------
 def do_mlflow_run(
-    model_type: Type[ProvidenceModule], dls: DataLoaders, experiment_id: str, random_seed: int, optim_config: dict,
-    instantiation_params: dict
+    model_type: Type[ProvidenceModule],
+    dls: DataLoaders,
+    experiment_id: str,
+    random_seed: int,
+    optim_config: dict,
+    instantiation_params: dict,
 ):
     with mlflow.start_run(experiment_id=experiment_id):
         set_seed(random_seed)
@@ -201,7 +236,7 @@ def do_mlflow_run(
             num_epochs=optim_config["num_epochs"],
         )
         run_config = defaultdict(dict)
-        run_config["model"].update(instantiation_params) # copy key-values
+        run_config["model"].update(instantiation_params)  # copy key-values
         run_config["model"]["type"] = model_type.__name__
         run_config["model"]["seed"] = random_seed
         write_callback_default_config(run_config)
@@ -212,23 +247,34 @@ def do_mlflow_run(
         logger = configure_logger_in_dir(output_dir)
         cbs = [
             LearningRateScheduler(
-                optimizer.opt, T_mult=optim_config["schedule_T_mult"], eta_min=optim_config["schedule_min"]
+                optimizer.opt,
+                T_mult=optim_config["schedule_T_mult"],
+                eta_min=optim_config["schedule_min"],
             ),
             IntervalMetricsVisualizer(callback_config["visualization_freq"], output_dir, logger=logger),
-            WriteModelOutputs(callback_config["model_output_freq"], output_dir, logger=logger, verbose=False),
+            WriteModelOutputs(
+                callback_config["model_output_freq"],
+                output_dir,
+                logger=logger,
+                verbose=False,
+            ),
             ModelCheckpointer(
                 output_dir=(output_dir / "model-checkpoints"),
                 track=callback_config["tracking_metric"],
                 logger=logger,
                 verbose=True,
-                keep_old=5
+                keep_old=5,
             ),
             EarlyStopping(
-                patience=callback_config["early_stopping_patience"], track=callback_config["tracking_metric"]
+                patience=callback_config["early_stopping_patience"],
+                track=callback_config["tracking_metric"],
             ),
             # our weibull loss takes a bit longer to bit below 1.0, but still begets strong results
-            EmergencyBrake(callback_config["ebrake_epoch"], callback_config["ebrake_requisite_loss"]),
-            LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve"))
+            EmergencyBrake(
+                callback_config["ebrake_epoch"],
+                callback_config["ebrake_requisite_loss"],
+            ),
+            LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve")),
         ]
         trainer = Trainer(mlflow_epoch)
         # run_config to something we can log to mlflow
@@ -252,10 +298,9 @@ def hybrid_parameter_sweep(
     optimizer_default: Dict[str, Hyperparameter],
     choice_metrics=("NaN_count", "RMSE", "SMAPE"),
     experiment_id=EXPERIMENT_ID,
-    random_seed: int
+    random_seed: int,
 ) -> Tuple[Dict[str, Hyperparameter], Dict[str, Hyperparameter]]:
-    """
-    Grid search over the model hyperparemeters, which is a product space over the 'network' key, in the supplied `hyperparameters`.
+    """Grid search over the model hyperparemeters, which is a product space over the 'network' key, in the supplied ``hyperparameters``.
     Iterate over the hyperparameters of the optimizer, linear in the sum length of the value lists under the dict keys
     - 'optimizer', for the optimizer of the above.
 
@@ -271,7 +316,12 @@ def hybrid_parameter_sweep(
         instantiation_parameters = {**model_defaults, **model_params}
         print(f"After update {instantiation_parameters = }")
         model, model_metrics = do_mlflow_run(
-            model_type, dls, experiment_id, random_seed, optimizer_default_parameters, instantiation_parameters
+            model_type,
+            dls,
+            experiment_id,
+            random_seed,
+            optimizer_default_parameters,
+            instantiation_parameters,
         )
         model_metrics = model_metrics.iloc[0].to_dict()
         model_metrics["model"] = model
@@ -292,11 +342,20 @@ def hybrid_parameter_sweep(
         sortable_models = []
         optimizer_parameters_base = {**optimizer_default, **optimizer_default_config()}
         for hparam_instance in param_values:
-            optimizer_parameters = {**optimizer_parameters_base, **best_optimizer_hparams, hparam: hparam_instance}
+            optimizer_parameters = {
+                **optimizer_parameters_base,
+                **best_optimizer_hparams,
+                hparam: hparam_instance,
+            }
             print(f"{hparam_instance = }")
             print(f"After update {optimizer_parameters = }")
             model, model_metrics = do_mlflow_run(
-                model_type, dls, experiment_id, random_seed, optimizer_parameters, invariant_network_parameters
+                model_type,
+                dls,
+                experiment_id,
+                random_seed,
+                optimizer_parameters,
+                invariant_network_parameters,
             )
             model_metrics = model_metrics.iloc[0].to_dict()
             model_metrics["model"] = model
@@ -320,7 +379,7 @@ def sweep_linearly_in_parameters(
     optimizer_default: Dict[str, Hyperparameter],
     choice_metrics=("NaN_count", "RMSE", "SMAPE"),
     experiment_id=EXPERIMENT_ID,
-    random_seed: int
+    random_seed: int,
 ) -> Tuple[Dict[str, Hyperparameter], Dict[str, Hyperparameter]]:
     """
     Iterate over the hyperparameters of the network and optimizer, linear in the sum length of the value lists under the dict keys
@@ -338,11 +397,20 @@ def sweep_linearly_in_parameters(
         print(f"{hparam = }")
         sortable_models = []
         for hparam_instance in param_values:
-            instantiation_parameters = {**model_defaults, **best_model_hparams, hparam: hparam_instance}
+            instantiation_parameters = {
+                **model_defaults,
+                **best_model_hparams,
+                hparam: hparam_instance,
+            }
             print(f"{hparam_instance = }")
             print(f"After update {instantiation_parameters = }")
             model, model_metrics = do_mlflow_run(
-                model_type, dls, experiment_id, random_seed, optimizer_default_parameters, instantiation_parameters
+                model_type,
+                dls,
+                experiment_id,
+                random_seed,
+                optimizer_default_parameters,
+                instantiation_parameters,
             )
             model_metrics = model_metrics.iloc[0].to_dict()
             model_metrics["model"] = model
@@ -362,11 +430,20 @@ def sweep_linearly_in_parameters(
         sortable_models = []
         optimizer_parameters_base = {**optimizer_default, **optimizer_default_config()}
         for hparam_instance in param_values:
-            optimizer_parameters = {**optimizer_parameters_base, **best_optimizer_hparams, hparam: hparam_instance}
+            optimizer_parameters = {
+                **optimizer_parameters_base,
+                **best_optimizer_hparams,
+                hparam: hparam_instance,
+            }
             print(f"{hparam_instance = }")
             print(f"After update {optimizer_parameters = }")
             model, model_metrics = do_mlflow_run(
-                model_type, dls, experiment_id, random_seed, optimizer_parameters, invariant_network_parameters
+                model_type,
+                dls,
+                experiment_id,
+                random_seed,
+                optimizer_parameters,
+                invariant_network_parameters,
             )
             model_metrics = model_metrics.iloc[0].to_dict()
             model_metrics["model"] = model
@@ -389,12 +466,11 @@ from providence.nn.rnn import ProvidenceGRU
 
 model_search_space = {
     "type": ProvidenceGRU,
-    "hyperparameters":
-        {
-            "hidden_size": [128, 200, 256, 512, 1024],
-            "num_layers": [1, 2, 3, 4],
-            "dropout": [0.0, 0.1, 0.3, 0.4, 0.6, 0.9],
-        },
+    "hyperparameters": {
+        "hidden_size": [128, 200, 256, 512, 1024],
+        "num_layers": [1, 2, 3, 4],
+        "dropout": [0.0, 0.1, 0.3, 0.4, 0.6, 0.9],
+    },
 }
 
 # COMMAND ----------
@@ -402,8 +478,8 @@ hyper_parameter_search_space = {
     "network": model_search_space["hyperparameters"],
     "optimizer": {
         "learning_rate": [3e-2, 1e-3, 3e-3, 1e-4],
-        "batch_size": [32, 64, 128, 256]
-    }
+        "batch_size": [32, 64, 128, 256],
+    },
 }
 
 # COMMAND ----------
@@ -421,10 +497,10 @@ best_model_params, best_optim_params = sweep_linearly_in_parameters(
         "type": torch.optim.Adam,
         "learning_rate": 3e-3,
         "batch_size": 64,
-        "num_epochs": 700
+        "num_epochs": 700,
     },
     # use this seed for each run, reset anew at the top of each model configuration construction.
-    random_seed=11068621650300516211
+    random_seed=11068621650300516211,
 )
 
 # COMMAND ----------

@@ -7,7 +7,7 @@ Not to imported or utilized, but here for documentation purposes
 Export controlled - see license file
 """
 
-__all__ = ['TSTPlus', 'MultiTSTPlus']
+__all__ = ["TSTPlus", "MultiTSTPlus"]
 
 # Cell
 import math
@@ -26,60 +26,86 @@ from .positional_encoders import *
 from ..data.core import *
 
 
-
 from torch import Tensor, nn
 from torch.nn import Conv1d, functional as F
 
 # Internal Cell
 class _TSTEncoderLayer(Module):
-    def __init__(self, q_len, d_model, n_heads, d_k=None, d_v=None, d_ff=256, store_attn=False,
-                 norm='BatchNorm', attn_dropout=0, dropout=0., bias=True, activation="gelu", res_attention=False, pre_norm=False):
+    def __init__(
+        self,
+        q_len,
+        d_model,
+        n_heads,
+        d_k=None,
+        d_v=None,
+        d_ff=256,
+        store_attn=False,
+        norm="BatchNorm",
+        attn_dropout=0,
+        dropout=0.0,
+        bias=True,
+        activation="gelu",
+        res_attention=False,
+        pre_norm=False,
+    ):
 
-        assert not d_model%n_heads, f"d_model ({d_model}) must be divisible by n_heads ({n_heads})"
+        assert not d_model % n_heads, f"d_model ({d_model}) must be divisible by n_heads ({n_heads})"
         d_k = ifnone(d_k, d_model // n_heads)
         d_v = ifnone(d_v, d_model // n_heads)
 
         # Multi-Head attention
         self.res_attention = res_attention
-        self.self_attn = MultiheadAttention(d_model, n_heads, d_k, d_v, attn_dropout=attn_dropout, proj_dropout=dropout, res_attention=res_attention)
+        self.self_attn = MultiheadAttention(
+            d_model, n_heads, d_k, d_v, attn_dropout=attn_dropout, proj_dropout=dropout, res_attention=res_attention
+        )
 
         # Add & Norm
         self.dropout_attn = nn.Dropout(dropout)
         if "batch" in norm.lower():
-            self.norm_attn = nn.Sequential(Transpose(1,2), nn.BatchNorm1d(d_model), Transpose(1,2))
+            self.norm_attn = nn.Sequential(Transpose(1, 2), nn.BatchNorm1d(d_model), Transpose(1, 2))
         else:
             self.norm_attn = nn.LayerNorm(d_model)
 
         # Position-wise Feed-Forward
-        self.ff = nn.Sequential(nn.Linear(d_model, d_ff, bias=bias),
-                                get_act_fn(activation),
-                                nn.Dropout(dropout),
-                                nn.Linear(d_ff, d_model, bias=bias))
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, d_ff, bias=bias),
+            get_act_fn(activation),
+            nn.Dropout(dropout),
+            nn.Linear(d_ff, d_model, bias=bias),
+        )
 
         # Add & Norm
         self.dropout_ffn = nn.Dropout(dropout)
         if "batch" in norm.lower():
-            self.norm_ffn = nn.Sequential(Transpose(1,2), nn.BatchNorm1d(d_model), Transpose(1,2))
+            self.norm_ffn = nn.Sequential(Transpose(1, 2), nn.BatchNorm1d(d_model), Transpose(1, 2))
         else:
             self.norm_ffn = nn.LayerNorm(d_model)
 
         self.pre_norm = pre_norm
         self.store_attn = store_attn
 
-    def forward(self, src:Tensor, prev:Optional[Tensor]=None, key_padding_mask:Optional[Tensor]=None, attn_mask:Optional[Tensor]=None) -> Tensor:
+    def forward(
+        self,
+        src: Tensor,
+        prev: Optional[Tensor] = None,
+        key_padding_mask: Optional[Tensor] = None,
+        attn_mask: Optional[Tensor] = None,
+    ) -> Tensor:
 
         # Multi-Head attention sublayer
         if self.pre_norm:
             src = self.norm_attn(src)
         ## Multi-Head attention
         if self.res_attention:
-            src2, attn, scores = self.self_attn(src, src, src, prev, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+            src2, attn, scores = self.self_attn(
+                src, src, src, prev, key_padding_mask=key_padding_mask, attn_mask=attn_mask
+            )
         else:
             src2, attn = self.self_attn(src, src, src, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
         if self.store_attn:
             self.attn = attn
         ## Add & Norm
-        src = src + self.dropout_attn(src2) # Add: residual connection with residual dropout
+        src = src + self.dropout_attn(src2)  # Add: residual connection with residual dropout
         if not self.pre_norm:
             src = self.norm_attn(src)
 
@@ -89,7 +115,7 @@ class _TSTEncoderLayer(Module):
         ## Position-wise Feed-Forward
         src2 = self.ff(src)
         ## Add & Norm
-        src = src + self.dropout_ffn(src2) # Add: residual connection with residual dropout
+        src = src + self.dropout_ffn(src2)  # Add: residual connection with residual dropout
         if not self.pre_norm:
             src = self.norm_ffn(src)
 
@@ -98,53 +124,114 @@ class _TSTEncoderLayer(Module):
         else:
             return src
 
+
 # Internal Cell
 class _TSTEncoder(Module):
-    def __init__(self, q_len, d_model, n_heads, d_k=None, d_v=None, d_ff=None, norm='BatchNorm', attn_dropout=0., dropout=0., activation='gelu',
-                 res_attention=False, n_layers=1, pre_norm=False, store_attn=False):
-        self.layers = nn.ModuleList([_TSTEncoderLayer(q_len, d_model, n_heads=n_heads, d_k=d_k, d_v=d_v, d_ff=d_ff, norm=norm,
-                                                      attn_dropout=attn_dropout, dropout=dropout,
-                                                      activation=activation, res_attention=res_attention,
-                                                      pre_norm=pre_norm, store_attn=store_attn) for i in range(n_layers)])
+    def __init__(
+        self,
+        q_len,
+        d_model,
+        n_heads,
+        d_k=None,
+        d_v=None,
+        d_ff=None,
+        norm="BatchNorm",
+        attn_dropout=0.0,
+        dropout=0.0,
+        activation="gelu",
+        res_attention=False,
+        n_layers=1,
+        pre_norm=False,
+        store_attn=False,
+    ):
+        self.layers = nn.ModuleList(
+            [
+                _TSTEncoderLayer(
+                    q_len,
+                    d_model,
+                    n_heads=n_heads,
+                    d_k=d_k,
+                    d_v=d_v,
+                    d_ff=d_ff,
+                    norm=norm,
+                    attn_dropout=attn_dropout,
+                    dropout=dropout,
+                    activation=activation,
+                    res_attention=res_attention,
+                    pre_norm=pre_norm,
+                    store_attn=store_attn,
+                )
+                for i in range(n_layers)
+            ]
+        )
         self.res_attention = res_attention
 
-    def forward(self, src:Tensor, key_padding_mask:Optional[Tensor]=None, attn_mask:Optional[Tensor]=None):
+    def forward(self, src: Tensor, key_padding_mask: Optional[Tensor] = None, attn_mask: Optional[Tensor] = None):
         output = src
         scores = None
         if self.res_attention:
-            for mod in self.layers: output, scores = mod(output, prev=scores, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+            for mod in self.layers:
+                output, scores = mod(output, prev=scores, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
             return output
         else:
-            for mod in self.layers: output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
+            for mod in self.layers:
+                output = mod(output, key_padding_mask=key_padding_mask, attn_mask=attn_mask)
             return output
+
 
 # Internal Cell
 class _TSTBackbone(Module):
-    def __init__(self, c_in, seq_len, max_seq_len=512,
-                 n_layers=3, d_model=128, n_heads=16, d_k=None, d_v=None,
-                 d_ff=256, norm='BatchNorm', attn_dropout=0., dropout=0., act="gelu", store_attn=False,
-                 key_padding_mask='auto', padding_var=None, attn_mask=None, res_attention=True, pre_norm=False,
-                 pe='zeros', learn_pe=True, verbose=False, **kwargs):
+    def __init__(
+        self,
+        c_in,
+        seq_len,
+        max_seq_len=512,
+        n_layers=3,
+        d_model=128,
+        n_heads=16,
+        d_k=None,
+        d_v=None,
+        d_ff=256,
+        norm="BatchNorm",
+        attn_dropout=0.0,
+        dropout=0.0,
+        act="gelu",
+        store_attn=False,
+        key_padding_mask="auto",
+        padding_var=None,
+        attn_mask=None,
+        res_attention=True,
+        pre_norm=False,
+        pe="zeros",
+        learn_pe=True,
+        verbose=False,
+        **kwargs,
+    ):
 
         # Input encoding
         q_len = seq_len
         self.new_q_len = False
-        if max_seq_len is not None and seq_len > max_seq_len: # Control temporal resolution
+        if max_seq_len is not None and seq_len > max_seq_len:  # Control temporal resolution
             self.new_q_len = True
             q_len = max_seq_len
             tr_factor = math.ceil(seq_len / q_len)
-            total_padding = (tr_factor * q_len - seq_len)
+            total_padding = tr_factor * q_len - seq_len
             padding = (total_padding // 2, total_padding - total_padding // 2)
-            self.W_P = nn.Sequential(Pad1d(padding), Conv1d(c_in, d_model, kernel_size=tr_factor, padding=0, stride=tr_factor))
-            pv(f'temporal resolution modified: {seq_len} --> {q_len} time steps: kernel_size={tr_factor}, stride={tr_factor}, padding={padding}.\n', verbose)
+            self.W_P = nn.Sequential(
+                Pad1d(padding), Conv1d(c_in, d_model, kernel_size=tr_factor, padding=0, stride=tr_factor)
+            )
+            pv(
+                f"temporal resolution modified: {seq_len} --> {q_len} time steps: kernel_size={tr_factor}, stride={tr_factor}, padding={padding}.\n",
+                verbose,
+            )
         elif kwargs:
             self.new_q_len = True
             t = torch.rand(1, 1, seq_len)
             q_len = Conv1d(1, 1, **kwargs)(t).shape[-1]
-            self.W_P = Conv1d(c_in, d_model, **kwargs) # Eq 2
-            pv(f'Conv1d with kwargs={kwargs} applied to input to create input encodings\n', verbose)
+            self.W_P = Conv1d(c_in, d_model, **kwargs)  # Eq 2
+            pv(f"Conv1d with kwargs={kwargs} applied to input to create input encodings\n", verbose)
         else:
-            self.W_P = nn.Linear(c_in, d_model)        # Eq 1: projection of feature vectors onto a d-dim vector space
+            self.W_P = nn.Linear(c_in, d_model)  # Eq 1: projection of feature vectors onto a d-dim vector space
         self.seq_len = q_len
 
         # Positional encoding
@@ -154,8 +241,22 @@ class _TSTBackbone(Module):
         self.dropout = nn.Dropout(dropout)
 
         # Encoder
-        self.encoder = _TSTEncoder(q_len, d_model, n_heads, d_k=d_k, d_v=d_v, d_ff=d_ff, norm=norm, attn_dropout=attn_dropout, dropout=dropout,
-                                   pre_norm=pre_norm, activation=act, res_attention=res_attention, n_layers=n_layers, store_attn=store_attn)
+        self.encoder = _TSTEncoder(
+            q_len,
+            d_model,
+            n_heads,
+            d_k=d_k,
+            d_v=d_v,
+            d_ff=d_ff,
+            norm=norm,
+            attn_dropout=attn_dropout,
+            dropout=dropout,
+            pre_norm=pre_norm,
+            activation=act,
+            res_attention=res_attention,
+            n_layers=n_layers,
+            store_attn=store_attn,
+        )
         self.transpose = Transpose(-1, -2, contiguous=True)
         self.key_padding_mask, self.padding_var, self.attn_mask = key_padding_mask, padding_var, attn_mask
 
@@ -171,21 +272,29 @@ class _TSTBackbone(Module):
         """
 
         # x and padding mask
-        if isinstance(inp, tuple): x, key_padding_mask = inp
-        elif self.key_padding_mask == 'auto': x, key_padding_mask = self._key_padding_mask(inp) # automatically identify padding mask
-        elif self.key_padding_mask == -1: x, key_padding_mask = inp[:, :-1], inp[:, -1]         # padding mask is the last channel
-        else: x, key_padding_mask = inp, None
+        if isinstance(inp, tuple):
+            x, key_padding_mask = inp
+        elif self.key_padding_mask == "auto":
+            x, key_padding_mask = self._key_padding_mask(inp)  # automatically identify padding mask
+        elif self.key_padding_mask == -1:
+            x, key_padding_mask = inp[:, :-1], inp[:, -1]  # padding mask is the last channel
+        else:
+            x, key_padding_mask = inp, None
 
         # Input encoding
-        if self.new_q_len: u = self.W_P(x).transpose(2,1) # Eq 2        # u: [bs x d_model x q_len] transposed to [bs x q_len x d_model]
-        else: u = self.W_P(x.transpose(2,1))              # Eq 1        # u: [bs x q_len x nvars] converted to [bs x q_len x d_model]
+        if self.new_q_len:
+            u = self.W_P(x).transpose(
+                2, 1
+            )  # Eq 2        # u: [bs x d_model x q_len] transposed to [bs x q_len x d_model]
+        else:
+            u = self.W_P(x.transpose(2, 1))  # Eq 1        # u: [bs x q_len x nvars] converted to [bs x q_len x d_model]
 
         # Positional encoding
         u = self.dropout(u + self.W_pos)
 
         # Encoder
-        z = self.encoder(u, key_padding_mask=key_padding_mask, attn_mask=self.attn_mask)    # z: [bs x q_len x d_model]
-        z = self.transpose(z)                                                               # z: [bs x d_model x q_len]
+        z = self.encoder(u, key_padding_mask=key_padding_mask, attn_mask=self.attn_mask)  # z: [bs x q_len x d_model]
+        z = self.transpose(z)  # z: [bs x d_model x q_len]
         if key_padding_mask is not None:
             z = z * torch.logical_not(key_padding_mask.unsqueeze(1))  # zero-out padding embeddings
         return z
@@ -193,53 +302,89 @@ class _TSTBackbone(Module):
     def _positional_encoding(self, pe, learn_pe, q_len, d_model):
         # Positional encoding
         if pe == None:
-            W_pos = torch.empty((q_len, d_model)) # pe = None and learn_pe = False can be used to measure impact of pe
+            W_pos = torch.empty((q_len, d_model))  # pe = None and learn_pe = False can be used to measure impact of pe
             nn.init.uniform_(W_pos, -0.02, 0.02)
             learn_pe = False
-        elif pe == 'zero':
+        elif pe == "zero":
             W_pos = torch.empty((q_len, 1))
             nn.init.uniform_(W_pos, -0.02, 0.02)
-        elif pe == 'zeros':
+        elif pe == "zeros":
             W_pos = torch.empty((q_len, d_model))
             nn.init.uniform_(W_pos, -0.02, 0.02)
-        elif pe == 'normal' or pe == 'gauss':
+        elif pe == "normal" or pe == "gauss":
             W_pos = torch.zeros((q_len, 1))
             torch.nn.init.normal_(W_pos, mean=0.0, std=0.1)
-        elif pe == 'uniform':
+        elif pe == "uniform":
             W_pos = torch.zeros((q_len, 1))
             nn.init.uniform_(W_pos, a=0.0, b=0.1)
-        elif pe == 'lin1d': W_pos = Coord1dPosEncoding(q_len, exponential=False, normalize=True)
-        elif pe == 'exp1d': W_pos = Coord1dPosEncoding(q_len, exponential=True, normalize=True)
-        elif pe == 'lin2d': W_pos = Coord2dPosEncoding(q_len, d_model, exponential=False, normalize=True)
-        elif pe == 'exp2d': W_pos = Coord2dPosEncoding(q_len, d_model, exponential=True, normalize=True)
-        elif pe == 'sincos': W_pos = PositionalEncoding(q_len, d_model, normalize=True)
-        else: raise ValueError(f"{pe} is not a valid pe (positional encoder. Available types: 'gauss'=='normal', \
-            'zeros', 'zero', uniform', 'lin1d', 'exp1d', 'lin2d', 'exp2d', 'sincos', None.)")
+        elif pe == "lin1d":
+            W_pos = Coord1dPosEncoding(q_len, exponential=False, normalize=True)
+        elif pe == "exp1d":
+            W_pos = Coord1dPosEncoding(q_len, exponential=True, normalize=True)
+        elif pe == "lin2d":
+            W_pos = Coord2dPosEncoding(q_len, d_model, exponential=False, normalize=True)
+        elif pe == "exp2d":
+            W_pos = Coord2dPosEncoding(q_len, d_model, exponential=True, normalize=True)
+        elif pe == "sincos":
+            W_pos = PositionalEncoding(q_len, d_model, normalize=True)
+        else:
+            raise ValueError(
+                f"{pe} is not a valid pe (positional encoder. Available types: 'gauss'=='normal', \
+            'zeros', 'zero', uniform', 'lin1d', 'exp1d', 'lin2d', 'exp2d', 'sincos', None.)"
+            )
         return nn.Parameter(W_pos, requires_grad=learn_pe)
 
     def _key_padding_mask(self, x):
         if self.padding_var is not None:
-            mask = TSMaskTensor(x[:, self.padding_var] == 1)            # key_padding_mask: [bs x q_len]
+            mask = TSMaskTensor(x[:, self.padding_var] == 1)  # key_padding_mask: [bs x q_len]
             return x, mask
         else:
             mask = torch.isnan(x)
             x[mask] = 0
             if mask.any():
-                mask = TSMaskTensor((mask.float().mean(1)==1).bool())   # key_padding_mask: [bs x q_len]
+                mask = TSMaskTensor((mask.float().mean(1) == 1).bool())  # key_padding_mask: [bs x q_len]
                 return x, mask
             else:
                 return x, None
 
+
 # Cell
 class TSTPlus(nn.Sequential):
     """TST (Time Series Transformer) is a Transformer that takes continuous time series as inputs"""
-    def __init__(self, c_in:int, c_out:int, seq_len:int, max_seq_len:Optional[int]=512,
-                 n_layers:int=3, d_model:int=128, n_heads:int=16, d_k:Optional[int]=None, d_v:Optional[int]=None,
-                 d_ff:int=256, norm:str='BatchNorm', attn_dropout:float=0., dropout:float=0., act:str="gelu", key_padding_mask:bool='auto',
-                 padding_var:Optional[int]=None, attn_mask:Optional[Tensor]=None, res_attention:bool=True, pre_norm:bool=False, store_attn:bool=False,
-                 pe:str='zeros', learn_pe:bool=True, flatten:bool=True, fc_dropout:float=0.,
-                 concat_pool:bool=False, bn:bool=False, custom_head:Optional[Callable]=None,
-                 y_range:Optional[tuple]=None, verbose:bool=False, **kwargs):
+
+    def __init__(
+        self,
+        c_in: int,
+        c_out: int,
+        seq_len: int,
+        max_seq_len: Optional[int] = 512,
+        n_layers: int = 3,
+        d_model: int = 128,
+        n_heads: int = 16,
+        d_k: Optional[int] = None,
+        d_v: Optional[int] = None,
+        d_ff: int = 256,
+        norm: str = "BatchNorm",
+        attn_dropout: float = 0.0,
+        dropout: float = 0.0,
+        act: str = "gelu",
+        key_padding_mask: bool = "auto",
+        padding_var: Optional[int] = None,
+        attn_mask: Optional[Tensor] = None,
+        res_attention: bool = True,
+        pre_norm: bool = False,
+        store_attn: bool = False,
+        pe: str = "zeros",
+        learn_pe: bool = True,
+        flatten: bool = True,
+        fc_dropout: float = 0.0,
+        concat_pool: bool = False,
+        bn: bool = False,
+        custom_head: Optional[Callable] = None,
+        y_range: Optional[tuple] = None,
+        verbose: bool = False,
+        **kwargs,
+    ):
         """
         Args:
             c_in: the number of features (aka variables, dimensions, channels) in the time series dataset.
@@ -280,52 +425,88 @@ class TSTPlus(nn.Sequential):
             As mentioned in the paper, the input must be standardized by_var based on the entire training set.
         """
         # Backbone
-        backbone = _TSTBackbone(c_in, seq_len=seq_len, max_seq_len=max_seq_len,
-                                n_layers=n_layers, d_model=d_model, n_heads=n_heads, d_k=d_k, d_v=d_v, d_ff=d_ff,
-                                attn_dropout=attn_dropout, dropout=dropout, act=act, key_padding_mask=key_padding_mask, padding_var=padding_var,
-                                attn_mask=attn_mask, res_attention=res_attention, pre_norm=pre_norm, store_attn=store_attn,
-                                pe=pe, learn_pe=learn_pe, verbose=verbose, **kwargs)
+        backbone = _TSTBackbone(
+            c_in,
+            seq_len=seq_len,
+            max_seq_len=max_seq_len,
+            n_layers=n_layers,
+            d_model=d_model,
+            n_heads=n_heads,
+            d_k=d_k,
+            d_v=d_v,
+            d_ff=d_ff,
+            attn_dropout=attn_dropout,
+            dropout=dropout,
+            act=act,
+            key_padding_mask=key_padding_mask,
+            padding_var=padding_var,
+            attn_mask=attn_mask,
+            res_attention=res_attention,
+            pre_norm=pre_norm,
+            store_attn=store_attn,
+            pe=pe,
+            learn_pe=learn_pe,
+            verbose=verbose,
+            **kwargs,
+        )
 
         # Head
         self.head_nf = d_model
         self.c_out = c_out
         self.seq_len = backbone.seq_len
-        if custom_head: head = custom_head(self.head_nf, c_out, self.seq_len) # custom head passed as a partial func with all its kwargs
-        else: head = self.create_head(self.head_nf, c_out, self.seq_len, act=act, flatten=flatten, concat_pool=concat_pool,
-                                           fc_dropout=fc_dropout, bn=bn, y_range=y_range)
-        super().__init__(OrderedDict([('backbone', backbone), ('head', head)]))
+        if custom_head:
+            head = custom_head(
+                self.head_nf, c_out, self.seq_len
+            )  # custom head passed as a partial func with all its kwargs
+        else:
+            head = self.create_head(
+                self.head_nf,
+                c_out,
+                self.seq_len,
+                act=act,
+                flatten=flatten,
+                concat_pool=concat_pool,
+                fc_dropout=fc_dropout,
+                bn=bn,
+                y_range=y_range,
+            )
+        super().__init__(OrderedDict([("backbone", backbone), ("head", head)]))
 
-
-    def create_head(self, nf, c_out, seq_len, flatten=True, concat_pool=False, act="gelu", fc_dropout=0., bn=False, y_range=None):
+    def create_head(
+        self, nf, c_out, seq_len, flatten=True, concat_pool=False, act="gelu", fc_dropout=0.0, bn=False, y_range=None
+    ):
         layers = [get_act_fn(act)]
         if flatten:
             nf *= seq_len
             layers += [Flatten()]
         else:
-            if concat_pool: nf *= 2
+            if concat_pool:
+                nf *= 2
             layers = [GACP1d(1) if concat_pool else GAP1d(1)]
         layers += [LinLnDrop(nf, c_out, bn=bn, p=fc_dropout)]
-        if y_range: layers += [SigmoidRange(*y_range)]
+        if y_range:
+            layers += [SigmoidRange(*y_range)]
         return nn.Sequential(*layers)
 
-
-    def show_pe(self, cmap='viridis', figsize=None):
+    def show_pe(self, cmap="viridis", figsize=None):
         plt.figure(figsize=figsize)
         plt.pcolormesh(self.backbone.W_pos.detach().cpu().T, cmap=cmap)
-        plt.title('Positional Encoding')
+        plt.title("Positional Encoding")
         plt.colorbar()
         plt.show()
         plt.figure(figsize=figsize)
-        plt.title('Positional Encoding - value along time axis')
+        plt.title("Positional Encoding - value along time axis")
         plt.plot(F.relu(self.backbone.W_pos.data).mean(1).cpu())
         plt.plot(-F.relu(-self.backbone.W_pos.data).mean(1).cpu())
         plt.show()
+
 
 # Cell
 @delegates(TSTPlus.__init__)
 class MultiTSTPlus(nn.Sequential):
     _arch = TSTPlus
-    def __init__(self, feat_list, c_out, seq_len, max_seq_len:Optional[int]=512, custom_head=None, **kwargs):
+
+    def __init__(self, feat_list, c_out, seq_len, max_seq_len: Optional[int] = 512, custom_head=None, **kwargs):
         r"""
         MultiTST is a class that allows you to create a model with multiple branches of TST.
 
@@ -339,7 +520,8 @@ class MultiTSTPlus(nn.Sequential):
         branches = nn.ModuleList()
         self.head_nf = 0
         for feat in self.feat_list:
-            if is_listy(feat): feat = len(feat)
+            if is_listy(feat):
+                feat = len(feat)
             m = build_ts_model(self._arch, c_in=feat, c_out=c_out, seq_len=seq_len, max_seq_len=max_seq_len, **kwargs)
             with torch.no_grad():
                 self.head_nf += m[0](torch.randn(1, feat, ifnone(seq_len, 10)).to(self.device)).shape[1]
@@ -355,20 +537,23 @@ class MultiTSTPlus(nn.Sequential):
         else:
             head = custom_head(self.head_nf, c_out, q_len)
 
-        layers = OrderedDict([('backbone', nn.Sequential(backbone)), ('head', nn.Sequential(head))])
+        layers = OrderedDict([("backbone", nn.Sequential(backbone)), ("head", nn.Sequential(head))])
         super().__init__(layers)
         self.to(self.device)
+
 
 # Internal Cell
 class _Splitter(Module):
     def __init__(self, feat_list, branches):
         self.feat_list, self.branches = feat_list, branches
+
     def forward(self, x):
         if is_listy(self.feat_list[0]):
             x = [x[:, feat] for feat in self.feat_list]
         else:
             x = torch.split(x, self.feat_list, dim=1)
         _out = []
-        for xi, branch in zip(x, self.branches): _out.append(branch(xi))
+        for xi, branch in zip(x, self.branches):
+            _out.append(branch(xi))
         output = torch.cat(_out, dim=1)
         return output

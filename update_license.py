@@ -14,6 +14,7 @@ from os import linesep
 
 
 LICENSE_FILENAME = "LICENSE_AND_REQUIRED_MARKING.rst"
+# flake8: noqa
 
 
 def git_ls_tree(dir="."):
@@ -61,9 +62,7 @@ def add_license(filename=LICENSE_FILENAME):
 
 def amend_commit(filename=LICENSE_FILENAME):
     """Amend the last commit with the license."""
-    _ = subprocess.Popen(
-        ["git", "commit", "--amend", "--no-edit", "--no-verify"], stdout=subprocess.PIPE
-    )
+    _ = subprocess.Popen(["git", "commit", "--amend", "--no-edit", "--no-verify"], stdout=subprocess.PIPE)
     time.sleep(0.1)
 
 

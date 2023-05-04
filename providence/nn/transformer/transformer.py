@@ -30,18 +30,26 @@ Final implementation is at the bottom.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 import copy
-from typing import Literal, Optional, Type, Union
+from typing import Literal
+from typing import Optional
+from typing import Type
+from typing import Union
 
 import torch as pt
-from torch.nn import Identity, LayerNorm, Linear, Module, ModuleList, Sequential
+from torch import Tensor
 from torch.nn import functional as F
-from torch.nn.init import xavier_normal_, xavier_uniform_
+from torch.nn import Identity
+from torch.nn import LayerNorm
+from torch.nn import Linear
+from torch.nn import Module
+from torch.nn import ModuleList
+from torch.nn import Sequential
+from torch.nn.init import xavier_normal_
+from torch.nn.init import xavier_uniform_
 from torch.nn.modules.activation import ReLU
 from torch.nn.modules.dropout import Dropout
 from torch.nn.parameter import Parameter
-from torch import Tensor
 
 from providence.utils import validate
 
@@ -49,16 +57,29 @@ _AttentionalAxis = Literal["temporal", "feature"]
 
 
 class Residual(Module):
+    """A Residual connection, which adds the inputs to the activation of every layer downstream.
+
+
+    Treats the first argument of the variadic list as a identity element to add to all subsequent activations.
+    Ownness is on the user to ensure the dimensionality of the propogated value matches all intermediary outputs.
+
+    Args:
+        layers: modules of a neural network
     """
-    A Residual connection, which adds the inputs to the activation of every layer downstream.
-    """
+
     def __init__(self, *layers):
         super().__init__()
         self.layers = ModuleList(layers)
 
     def forward(self, *x, **kwargs) -> Tensor:
-        """Applies a residual connection to all layers, treating the first argument of the variadic list as a identity element to add to
-        all subsequent activations.
+        """Applies a residual connection to all layers
+
+        Args:
+            x: variadic inputs, Tensors or otherwise, so long as ``layers`` understand the input
+            kwargs: any keyword arguments for the first layer of the network
+
+        Returns:
+            Tensor: entirely dependent on supplied ``layers``
         """
         identity = x[0]
         if self.layers:
@@ -70,23 +91,41 @@ class Residual(Module):
 
 
 class SkipConnected(Sequential):
-    """
-    A thin wrapper around the skip connection, over an arbitrary number of module i.e. a block.
+    """The skip connection, over an arbitrary number of module i.e. a block.
+
     Unlike Residual, the initial input is not shared between each of the layers
     Owness is on the user to make sure dimensions match for the addition.
     """
+
     def forward(self, input: Tensor) -> Tensor:
+        """Perform the skip-connected forward pass on ``input``
+
+        We add the input to the output of the inner layers
+
+        Args:
+            input (Tensor): non-None Tensor
+
+        Returns:
+            Tensor: shape matching ``input`` exactly
+        """
         out = super().forward(input)
         return out + input
 
 
 class MultiArgSequence(Sequential):
-    """
-    Module-ception. I want to maintain the clean abstraction, without adding a bunch of noise to the code.
-    Implementing this will allowing me to pass multiple arguments through a Sequential.
+    """Extension to Sequential, supporting multiple arguments for the initial input
+
+    I wanted to maintain the clean abstraction, without adding a bunch of noise to the code.
+    Implementing this allows one to pass multiple arguments through a Sequential.
     Inherited rather than re-implented to pick up the JIT wrapper niceties already done for us.
     """
+
     def forward(self, *input, **kwargs):
+        """Perform a forward pass, supporting variadic ``input`` and ``kwargs``
+
+        Returns:
+            Tensor: final output of the final layer, be it a single or tuple of Tensors
+        """
         output = self[0](*input, **kwargs)
         for module in self[1:]:
             output = module(output)
@@ -94,9 +133,26 @@ class MultiArgSequence(Sequential):
 
 
 class BasicAttention(Module):
+    """Simple implementation of the Scaled Dot-Product Attention as shown in Attention is All You Need
+
+    This implementatation is simplified by using more PyTorch objects than primitives (e.g. Parameter)
+    to perform the attention computation.
+    We have done very little testing varying the *_dim parameters, but it workable. The field has moved
+    away from fiddling with these particular parameters, finding that scaling and more ineresting attention
+    algorithms - in general - are more useful, more readily parallelizable, and more performant on a given task.
+    You have been warned.
+
+    Args:
+        embed_dim (int): input dimension
+        dropout (float, optional): _description_. Defaults to 0.0.
+        bias (bool, optional): whether to use bias in the Linear layers. Defaults to True.
+        key_dim (Optional[int], optional): configurable dimension for the keys. Defaults to None.
+        value_dim (Optional[int], optional): configurable dimension for the values. Defaults to None.
+        query_dim (Optional[int], optional): configurable dimension for the queries. Defaults to None.
+        attention_axis (_AttentionalAxis, optional): axis to attend to either "feature" or "temporal".
+            Defaults to "temporal".
     """
-    Simple implementation of the Scaled Dot-Product Attention implemented in "Attention is All You Need"
-    """
+
     def __init__(
         self,
         embed_dim: int,
@@ -106,7 +162,7 @@ class BasicAttention(Module):
         key_dim: Optional[int] = None,
         value_dim: Optional[int] = None,
         query_dim: Optional[int] = None,
-        attention_axis: _AttentionalAxis = "temporal"
+        attention_axis: _AttentionalAxis = "temporal",
     ):
         super().__init__()
         validate(isinstance(embed_dim, int), "Embedding dimension should be an integer")
@@ -122,6 +178,10 @@ class BasicAttention(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         # When would we NOT have all of these be (embed_dim x ___dim)?
         # When we're finally connecting the encoder layer with the decoder: k = v = memory output
         # before that (and maybe even afterwards) it's sensible that these be the same.
@@ -157,9 +217,31 @@ class BasicAttention(Module):
         self.attention_dim = att_dim
 
     def forward(self, key: Tensor, value: Tensor, query: Tensor, mask: Optional[Tensor] = None) -> Tensor:
-        validate(len(key.shape) == 3, f"Expected key of shape (time, batch, features). Got shape {key.shape}")
-        validate(len(value.shape) == 3, f"Expected value of shape (time, batch, features). Got shape {value.shape}")
-        validate(len(query.shape) == 3, f"Expected query of shape (time, batch, features). Got shape {query.shape}")
+        """Apply (optionally masked) attention over ``key``, ``value``, and ``query``
+
+        Args:
+            key (Tensor): some transformation of the input, shape expected to match query and value
+            value (Tensor): some transformation of the input, shape expected to match key and query
+            query (Tensor): some transformation of the input, shape expected to match key and value
+            mask (Tensor, optional): either our sequence-length mask or a square matrix matching the attention_axis dimension.
+                Defaults to None.
+
+        Returns:
+            Tensor: attended values mapped back to the input space. Shape should exactly match ``key``
+        """
+
+        validate(
+            len(key.shape) == 3,
+            f"Expected key of shape (time, batch, features). Got shape {key.shape}",
+        )
+        validate(
+            len(value.shape) == 3,
+            f"Expected value of shape (time, batch, features). Got shape {value.shape}",
+        )
+        validate(
+            len(query.shape) == 3,
+            f"Expected query of shape (time, batch, features). Got shape {query.shape}",
+        )
 
         q, k = self.q_proj(query), self.k_proj(key)
         prod = q @ k.transpose(1, 2)
@@ -190,12 +272,34 @@ class BasicAttention(Module):
 
 
 class MultiheadedAttention(Module):
+    """Multiheaded Attention that applies the algorithm straightforwardly, but slowly.
+
+    This is the implementation that was used to produce the paper Providence: A Neural Network Framework...
+    Ideally, a fast version of this would be used. MultiheadedAttention3 is the next best thing, showing
+    similar performance, but not slowing linearly with the number of attention aheads
+
+    Args:
+        n_heads (int): number of attention heads, must be positive integer. Computational time scale linear in
+        number of heads
+        embed_dim (int): dimension of the inner Linear layers internal to BasicAttention
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Best values depend on other parameters.
+            Defaults to 0.0 (no dropout).
+        attention_axis (_AttentionalAxis, optional): axis to attend to either "feature" or "temporal".
+            Defaults to "temporal".
+    """
+
     def __init__(
-        self, n_heads: int, embed_dim: int, dropout: float = 0.0, *, attention_axis: _AttentionalAxis = "temporal"
+        self,
+        n_heads: int,
+        embed_dim: int,
+        dropout: float = 0.0,
+        *,
+        attention_axis: _AttentionalAxis = "temporal",
     ):
         super().__init__()
         validate(
-            isinstance(n_heads, int), "Number of heads must be an integer. You can't have half a head paying attention"
+            isinstance(n_heads, int),
+            "Number of heads must be an integer. You can't have half a head paying attention",
         )
         validate(n_heads > 1, "Must supply more than one head for MULTI-headed attention")
         validate(isinstance(embed_dim, int), "Embedding dimension should be an integer")
@@ -209,27 +313,78 @@ class MultiheadedAttention(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         self.attention_heads = _get_clones(
-            BasicAttention(self.embed_dim, dropout=self.dropout, bias=False, attention_axis=self.attention_axis),
-            self.n_heads
+            BasicAttention(
+                self.embed_dim,
+                dropout=self.dropout,
+                bias=False,
+                attention_axis=self.attention_axis,
+            ),
+            self.n_heads,
         )
         self.linear_out = Linear(self.attention_concat_dim, self.embed_dim)
 
     def forward(self, key: Tensor, value: Tensor, query: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """Apply (optionally masked) causal, multi-head attention over ``key``, ``value``, and ``query``
+
+        This forward pass literally attends with n_heads many heads, one at a time. It is highly serial and performs
+        similar to a RNN on the same data. See the other implementations of Multiheaded throughout this repository for
+        more parallelizable implementations.
+
+        Args:
+            key (Tensor): some transformation of the input, shape expected to match query and value
+            value (Tensor): some transformation of the input, shape expected to match key and query
+            query (Tensor): some transformation of the input, shape expected to match key and value
+            mask (Tensor, optional): either our sequence-length mask or a square matrix matching the attention_axis dimension.
+                Defaults to None.
+
+        Returns:
+            Tensor: attended values mapped back to the input space. Shape should exactly match ``key``
+        """
+
         # This is surprisingly not slow. Tensor.contiguous() makes it even faster. :)
-        attended = pt.cat([head(key, value, query, mask=mask) for head in self.attention_heads], dim=-1).contiguous()
+        attended = pt.cat(
+            [head(key, value, query, mask=mask) for head in self.attention_heads],
+            dim=-1,
+        ).contiguous()
         out = self.linear_out(attended)
 
         return out
 
 
 class MultiheadedAttention2(Module):
+    """Multiheaded Attention that attempts to follow the template of BasicAttention, but across multiple heads.
+
+    This implementation does not perform well on any tasks. Our investigation suggests it is because the attention
+    is too deliberately across all data, rather than per device.
+    In other words, this implementation is technically defective and should be avoided until further experimentation.
+
+    Args:
+        n_heads (int): number of attention heads, must be positive integer. Computational time scales linear in
+        number of heads
+        embed_dim (int): dimension of the inner Linear layers internal to BasicAttention
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Best values depend on other parameters.
+            Defaults to 0.0 (no dropout).
+        attention_axis (_AttentionalAxis, optional): axis to attend to either "feature" or "temporal".
+            Defaults to "temporal".
+    """
+
     def __init__(
-        self, n_heads: int, embed_dim: int, dropout: float = 0.0, *, attention_axis: _AttentionalAxis = "temporal"
+        self,
+        n_heads: int,
+        embed_dim: int,
+        dropout: float = 0.0,
+        *,
+        attention_axis: _AttentionalAxis = "temporal",
     ):
         super().__init__()
         validate(
-            isinstance(n_heads, int), "Number of heads must be an integer. You can't have half a head paying attention"
+            isinstance(n_heads, int),
+            "Number of heads must be an integer. You can't have half a head paying attention",
         )
         validate(isinstance(embed_dim, int), "Embedding dimension should be an integer")
         validate(embed_dim > 0, "Embedding dimension should be positive")
@@ -242,6 +397,10 @@ class MultiheadedAttention2(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         self.dropout = Dropout(self.dropout_p)
         self.key_projection = Linear(self.embed_dim, self.attention_concat_dim)
         self.value_projection = Linear(self.embed_dim, self.attention_concat_dim)
@@ -257,6 +416,19 @@ class MultiheadedAttention2(Module):
         self.attention_axis_index = att_dim
 
     def forward(self, key: Tensor, value: Tensor, query: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """Apply (optionally masked) causal, multi-head attention over ``key``, ``value``, and ``query``
+
+        Args:
+            key (Tensor): some transformation of the input, shape expected to match query and value
+            value (Tensor): some transformation of the input, shape expected to match key and query
+            query (Tensor): some transformation of the input, shape expected to match key and value
+            mask (Tensor, optional): either our sequence-length mask or a square matrix matching the attention_axis dimension.
+                Defaults to None.
+
+        Returns:
+            Tensor: attended values mapped back to the input space. Shape should exactly match ``key``
+        """
+
         # This is surprisingly not slow. Tensor.contiguous() makes it even faster. :)
         # length, batch, n_features = key.shape
 
@@ -287,12 +459,32 @@ class MultiheadedAttention2(Module):
 
 
 class MultiheadedAttention3(Module):
+    """Multiheaded Attention that overloads the functionality of the BasicAttention module to ease implementation.
+
+    Caveat: there are extra mapping layers needed to support the inner BasicAttention, one before and one after
+
+    Args:
+        n_heads (int): number of attention heads, must be positive integer. Computational time scales sublinear in
+            number of heads up to 8 heads.
+        embed_dim (int): dimension of the inner Linear layers internal to BasicAttention
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Best values depend on other parameters.
+            Defaults to 0.0 (no dropout).
+        attention_axis (_AttentionalAxis, optional): axis to attend to either "feature" or "temporal".
+            Defaults to "temporal".
+    """
+
     def __init__(
-        self, n_heads: int, embed_dim: int, dropout: float = 0.0, *, attention_axis: _AttentionalAxis = "temporal"
+        self,
+        n_heads: int,
+        embed_dim: int,
+        dropout: float = 0.0,
+        *,
+        attention_axis: _AttentionalAxis = "temporal",
     ):
         super().__init__()
         validate(
-            isinstance(n_heads, int), "Number of heads must be an integer. You can't have half a head paying attention"
+            isinstance(n_heads, int),
+            "Number of heads must be an integer. You can't have half a head paying attention",
         )
         validate(isinstance(embed_dim, int), "Embedding dimension should be an integer")
         validate(embed_dim > 0, "Embedding dimension should be positive")
@@ -305,13 +497,17 @@ class MultiheadedAttention3(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         self.inner_attention = BasicAttention(
             self.embed_dim,
             self.dropout_p,
             key_dim=self.attention_concat_dim,
             value_dim=self.attention_concat_dim,
             query_dim=self.attention_concat_dim,
-            attention_axis=self.attention_axis
+            attention_axis=self.attention_axis,
         )
         self.linear_out = Linear(self.attention_concat_dim, self.embed_dim) if self.n_heads != 1 else Identity()
 
@@ -324,6 +520,18 @@ class MultiheadedAttention3(Module):
         self.attention_axis_index = att_dim
 
     def forward(self, key: Tensor, value: Tensor, query: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """Apply (optionally masked) causal, multi-head attention over ``key``, ``value``, and ``query``
+
+        Args:
+            key (Tensor): some transformation of the input, shape expected to match query and value
+            value (Tensor): some transformation of the input, shape expected to match key and query
+            query (Tensor): some transformation of the input, shape expected to match key and value
+            mask (Tensor, optional): either our sequence-length mask or a square matrix matching the attention_axis dimension.
+                Defaults to None.
+
+        Returns:
+            Tensor: attended values mapped back to the input space. Shape should exactly match ``key``
+        """
         attended = self.inner_attention(key, value, query, mask=mask)
         out = self.linear_out(attended).contiguous()
         return out
@@ -333,11 +541,27 @@ MhaInterface = Union[Type[MultiheadedAttention], Type[MultiheadedAttention2], Ty
 
 
 class EncoderBlock(Module):
-    """
-    The Encoder block, based on the architecture from Attention is All You Need.
+    """The Encoder block (sans coupling to the input embedding block and dropout) from Attention is All You Need.
 
-    We omit the coupling to the Input Embedding block, and its dropout layer.
+    Omitting the coupling was to free us to make more drastic changes to the attention algorithm internal to this
+    module.
+
+    Args:
+        n_attention_heads (int, optional): number of attention heads for the attention implementation. Defaults to 4.
+        model_dimension (int, optional): feature dimension of the input tensors. Defaults to 128.
+        feed_forward_internal_dimension (int, optional): dimension of the inner feed forward layers. Defaults to 512.
+        feed_forward_activation (Type[Module], optional): a Torch Module or objectified-function that can be
+        initialized in ``reset_parameters()``. Defaults to ReLU.
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Best values depend on other parameters.
+            Defaults to 0.0 (no dropout).
+        layer_norm_epsilon (float, optional): epsilon fed to the LayerNorm internal to each (Encoder|Decoder)Block.
+            Defaults to 1e-5.
+        attention_axis (str, optional): defines whether attention is applied on features (like most transformers) or
+            across the time axis (unique to this work and some attention-augmented RNNs). Defaults to "temporal".
+        t_attention (MhaInterface, optional): the Multihead attention algorithm / implementation to use.
+            Defaults to MultiheadedAttention3.
     """
+
     def __init__(
         self,
         n_attention_heads: int = 4,
@@ -348,7 +572,7 @@ class EncoderBlock(Module):
         layer_norm_epsilon: float = 1e-5,
         *,
         attention_axis: _AttentionalAxis = "temporal",
-        t_attention: MhaInterface = MultiheadedAttention
+        t_attention: MhaInterface = MultiheadedAttention,
     ):
         super().__init__()
         self.n_heads = n_attention_heads
@@ -363,8 +587,16 @@ class EncoderBlock(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         attention = Residual(
-            self._attention_type(n_heads=self.n_heads, embed_dim=self.d_model, attention_axis=self.attention_axis)
+            self._attention_type(
+                n_heads=self.n_heads,
+                embed_dim=self.d_model,
+                attention_axis=self.attention_axis,
+            )
         )
         attending_sublayer = MultiArgSequence(attention, Dropout(self.dropout_p), LayerNorm(self.d_model))
 
@@ -380,9 +612,14 @@ class EncoderBlock(Module):
         self.assembled = MultiArgSequence(attending_sublayer, position_wise_ff_sublayer)
 
     def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
-        """Activates the encoder, optionally applying a mask
+        """Activate the encoder, optionally applying a mask
 
-        Output shape should match input `x` exactly
+        Args:
+            x (Tensor): tensor of shape [time, entity, feature]
+            mask (Tensor): either our sequence-length mask or a square matrix matching the attention_axis dimension.
+
+        Returns:
+            Tensor: encoding of ``x`` shape should match input ``x`` exactly.
         """
         return self.assembled(x, x, x, mask)
 
@@ -392,7 +629,26 @@ class DecoderBlock(Module):
     The Decoder block, based on the architecture from Attention is All You Need
 
     Like the encoder, we omit the coupling to the output embedding block along with its additional dropout.
+
+    Args:
+        n_attention_heads (int, optional): number of attention heads for the attention implementation. Defaults to 4.
+        model_dimension (int, optional): feature dimension of the input tensors. Defaults to 128.
+        feed_forward_internal_dimension (int, optional): dimension of the inner feed forward layers. Defaults to 512.
+        feed_forward_activation (Type[Module], optional): a Torch Module or objectified-function that can be
+        initialized in ``reset_parameters()``. Defaults to ReLU.
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Best values depend on other parameters.
+            Defaults to 0.0 (no dropout).
+        layer_norm_epsilon (float, optional): epsilon fed to the LayerNorm internal to each (Encoder|Decoder)Block.
+            Defaults to 1e-5.
+        attention_axis (str, optional): defines whether attention is applied on features (like most transformers) or
+            across the time axis (unique to this work and some attention-augmented RNNs). Defaults to "temporal".
+        t_attention (MhaInterface, optional): the Multihead attention algorithm / implementation to use.
+            Defaults to MultiheadedAttention3.
+
+    Raises:
+        ValueError: some implementations of ``MhaInferface`` may raise if ``n_attention_heads == 1``
     """
+
     def __init__(
         self,
         n_attention_heads: int = 4,
@@ -403,7 +659,7 @@ class DecoderBlock(Module):
         layer_norm_epsilon: float = 1e-5,
         *,
         attention_axis: _AttentionalAxis = "temporal",
-        t_attention: MhaInterface = MultiheadedAttention
+        t_attention: MhaInterface = MultiheadedAttention,
     ):
         super().__init__()
         self.n_heads = n_attention_heads
@@ -418,8 +674,16 @@ class DecoderBlock(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         attention = Residual(
-            self._attention_type(n_heads=self.n_heads, embed_dim=self.d_model, attention_axis=self.attention_axis)
+            self._attention_type(
+                n_heads=self.n_heads,
+                embed_dim=self.d_model,
+                attention_axis=self.attention_axis,
+            )
         )
         self.masked_self_attention = MultiArgSequence(attention, Dropout(self.dropout_p), LayerNorm(self.d_model))
 
@@ -427,10 +691,13 @@ class DecoderBlock(Module):
         # be fed into this decoder's internal encoder as the key and value, while the query is the actual input
         # this attention receives key and value from the encoder, query from the decoder's (masked) self-attention
         merging_attention = self._attention_type(
-            n_heads=self.n_heads, embed_dim=self.d_model, attention_axis=self.attention_axis
+            n_heads=self.n_heads,
+            embed_dim=self.d_model,
+            attention_axis=self.attention_axis,
         )
         merging_attention_sublayer = MultiArgSequence(
-            Residual(merging_attention), LayerNorm(self.d_model, eps=self.layer_norm_epsilon)
+            Residual(merging_attention),
+            LayerNorm(self.d_model, eps=self.layer_norm_epsilon),
         )
 
         position_wise_ff_sublayer = Sequential(
@@ -450,13 +717,23 @@ class DecoderBlock(Module):
         x: Tensor,
         memory: Tensor,
         self_attention_mask: Optional[Tensor] = None,
-        memory_mask: Optional[Tensor] = None
+        memory_mask: Optional[Tensor] = None,
     ) -> Tensor:
-        """
-        Decodes the given input sequence and memory (output from an encoder), optionally applying a mask on self-attention - to prevent
-        peering into the future - and a mask on the attention given to the memory.
+        """Decode the given input sequence ``x`` and ``memory`` (output from an encoder), optionally applying masking.
 
-        Output shape should match input `x` exactly
+        Masking applied to self-attention is to prevent peering into the future of time series or signal data.
+        Masking applied to the memory on the attention given to the memory, minimizing dependency on the memory
+
+        Args:
+            x (Tensor): tensor of shape [time, entity, feature]
+            memory (Tensor): tensor of shape [time, entity, feature]
+            self_attention_mask (Tensor, optional): either our "rectangular" sequence-length mask or a square matrix
+                matching the attention_axis dimension.
+            memory_mask (Tensor, optional): either our "rectangular" sequence-length mask or a square matrix matching
+                the attention_axis dimension.
+
+        Returns:
+            Tensor: decoding of ``x`` and ``memory`` shape should match input ``x`` exactly.
         """
         # these function calls are noticeably slower with kwargs in my tests, but it's more readable.
         attended = self.masked_self_attention(x, x, x, mask=self_attention_mask)
@@ -470,8 +747,29 @@ class DecoderBlock(Module):
 class Transformer(Module):
     """A transformer nearly ready for our predict-parameters-from-an-embedding paradigm.
 
-    suck. Definitely work-in-progress.
+    Args:
+        model_dimension (int, optional): number of input features necessary to infer on an example from the dataset.
+            Defaults to 128.
+        feed_forward_internal_dimension (int, optional): size of all feedforward layers used throughout.
+            Defaults to 512.
+        n_layers (int, optional): number of layers in each (Encoder|Decoder)Block. Defaults to 2.
+        num_heads (int, optional): number of attention heads used in the multihead attention algorithm; thereby
+            coupled to ``t_attention`` implementation. Defaults to 4.
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Best values depend on other parameters.
+            Defaults to 0.0 (no dropout).
+        layer_norm_epsilon (float, optional): epsilon fed to the LayerNorm internal to each (Encoder|Decoder)Block.
+            Defaults to 1e-5.
+        positional_encoding_dimension (int, optional): length of the positional encoding which decorates sequences
+            Must be longer than the longest sequence in the dataset. Defaults to 2000.
+        attention_axis (str, optional): defines whether attention is applied on features (like most transformers) or
+            across the time axis (unique to this work and some attention-augmented RNNs). Defaults to "temporal".
+        t_attention (MhaInterface, optional): the Multihead attention algorithm / implementation to use.
+            Defaults to MultiheadedAttention3.
+
+    Raises:
+        ValueError: some implementations of ``MhaInferface`` may raise if ``n_attention_heads == 1``
     """
+
     def __init__(
         self,
         model_dimension: int = 128,
@@ -483,7 +781,7 @@ class Transformer(Module):
         positional_encoding_dim: int = 2000,
         *,
         attention_axis: _AttentionalAxis = "temporal",
-        t_attention: MhaInterface = MultiheadedAttention
+        t_attention: MhaInterface = MultiheadedAttention,
     ):
         super().__init__()
         self.d_model = model_dimension
@@ -499,6 +797,10 @@ class Transformer(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize model parameters based on fields.
+
+        Used to programmatically (re-)initialize this instance
+        """
         self.embedding = Linear(self.d_model, self.d_model)
         self.positional_encoding = PositionalEncoding(self.d_model, self.dropout_p, max_len=self.positional_encoding_p)
         self.encoders = _get_clones(
@@ -509,7 +811,7 @@ class Transformer(Module):
                 dropout=self.dropout_p,
                 layer_norm_epsilon=self.layer_norm_epsilon,
                 attention_axis=self.attention_axis,
-                t_attention=self.t_attention
+                t_attention=self.t_attention,
             ),
             self.n_layers,
         )
@@ -521,20 +823,39 @@ class Transformer(Module):
                 dropout=self.dropout_p,
                 layer_norm_epsilon=self.layer_norm_epsilon,
                 attention_axis=self.attention_axis,
-                t_attention=self.t_attention
+                t_attention=self.t_attention,
             ),
             self.n_layers,
         )
 
     def forward(
-        self, x: Tensor, encoder_mask: Optional[Tensor] = None, decoder_mask: Optional[Tensor] = None
+        self,
+        x: Tensor,
+        encoder_mask: Optional[Tensor] = None,
+        decoder_mask: Optional[Tensor] = None,
     ) -> Tensor:
-        """
-        Transformer inference is where things tend to vary between architectures. I'm thinking about making the decoder mask
+        """Perform encoder-decoder pass on ``x``, per the Transformer algorithm in Attention is All You Need
+
+                Transformer inference is where things tend to vary between architectures. I'm thinking about making the decoder mask
         for some `ProvidenceTransformer` class to be implicit in the model, so the model __can't__ cheat.
 
         Perhaps for the final "Providence Transformer?
+
+
+        Args:
+            x (Tensor): tensor of shape [time, entity, feature]
+            encoder_mask (Optional[Tensor], optional): mask passed to the encoder, with shape matching the
+                attention_axis dimension. Defaults to None.
+            decoder_mask (Optional[Tensor], optional): mask passed to the decoder, with shape matching the
+                attention_axis dimension. Defaults to None.
+
+        Returns:
+            Tensor: tensor of attention paid along the attention_axis, exactly matching shape of ``x``
+
+            This implementation does not directly output attented values, so one should not expect output tensor
+            to sum to (approx.) 1 along the attended axis (as you might when inspecting the correctness of attention)
         """
+
         x = self.embedding(x)
         x.add_(self.positional_encoding(x))
 
@@ -558,8 +879,16 @@ def _get_clones(module, N):
     return ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
-def set_attention_axis(transformer: Transformer, new_axis: str) -> None:
-    "Propogate the (re)setting of the attention axis. Used for experiments"
+def set_attention_axis(transformer: Transformer, new_axis: _AttentionalAxis) -> None:
+    """Propogate the (re)setting of the attention axis. Used for experiments.
+
+    Args:
+        transformer (Transformer): model on which the attention axis will change
+        new_axis (str): the new attention axis
+
+    Raises:
+        ValueError: if ``new_axis`` is not one of "temporal" or "feature"
+    """
     if new_axis == "temporal":
         new_dim = 0
     elif new_axis == "feature":
@@ -576,10 +905,17 @@ def set_attention_axis(transformer: Transformer, new_axis: str) -> None:
 
 
 class PositionalEncoding(Module):
-    """
+    """Sinusoidal positional encoding, computed ahead-of-time, to decorate tensors with additional ordinality.
+
     Implement the PE function in a temporal context: all the sequence be decorated with ordering information,
     before we look across (i.e. backwards in) time
+
+    Args:
+        d_model (int): dimension of the model input
+        dropout (float, optional): percentage in [0.0, 1.0] to apply dropout. Defaults to 0.0 (no dropout).
+        max_len (int, optional): maximum length of a sequence that will be passed to this. Defaults to 5000.
     """
+
     def __init__(self, d_model, dropout=0.0, max_len=5000):
         super(PositionalEncoding, self).__init__()
         import math
@@ -603,8 +939,16 @@ class PositionalEncoding(Module):
         # pe = pe.unsqueeze(0)
         self.register_buffer("pe", pe)
 
-    def forward(self, x: pt.Tensor):
-        pe = self.pe[:x.size(0)]
+    def forward(self, x: Tensor):
+        """Positonally encode ``x``
+
+        Args:
+            x (Tensor): input matching the dimensionality of the ``d_model``
+
+        Returns:
+            Tensor: dropout-applied, positionally encoded ``x``
+        """
+        pe = self.pe[: x.size(0)]
 
         batches = x.size(1)  # dependent on data being passed in with [sequence, batch or device, feature]
         full_pe = pt.stack([pe] * batches, dim=1)

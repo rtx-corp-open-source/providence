@@ -7,25 +7,29 @@ Pytest only affords leaving the methods outside of a TestUnit class (which is a 
 Export controlled - see license file
 """
 from pathlib import Path
+
+from torch import nn
+
 from providence.training import EpochLosses
 from providence.utils import configure_logger_in_dir
 from providence_utils.callbacks import ModelCheckpointer
-
-from torch import nn
 
 logger = configure_logger_in_dir("./tests", logger_name="model-checkpointer-test-001")
 
 tiny_model = nn.Linear(2, 1)
 output_dir = Path(".tmp")
 output_dir.mkdir(exist_ok=True)
+
+
 def clean_up():
     for child in output_dir.iterdir():
         child.unlink(missing_ok=True)
 
+
 def use_callback(cb: ModelCheckpointer, n_epochs: int):
     for inc in range(n_epochs):
-        fake_loss = (100 - inc)
-        cb.after_epoch(inc, tiny_model, ..., EpochLosses(0, fake_loss), ...)
+        fake_loss = 100 - inc
+        cb.after_epoch(inc, tiny_model, ..., EpochLosses(0, fake_loss), ...)  # type: ignore[arg-type]
 
 
 def test_keep_nothing():
@@ -35,7 +39,10 @@ def test_keep_nothing():
     checkpointer = ModelCheckpointer(output_dir, "val_loss", logger, keep_old=keep_old_p)
     use_callback(checkpointer, 10)
 
-    assert len(list(output_dir.iterdir())) == num_to_expect, f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+    assert (
+        len(list(output_dir.iterdir())) == num_to_expect
+    ), f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+
 
 def test_keep_small_number():
     clean_up()
@@ -44,7 +51,10 @@ def test_keep_small_number():
     checkpointer = ModelCheckpointer(output_dir, "val_loss", logger, keep_old=keep_old_p)
     use_callback(checkpointer, 10)
 
-    assert len(list(output_dir.iterdir())) == num_to_expect, f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+    assert (
+        len(list(output_dir.iterdir())) == num_to_expect
+    ), f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+
 
 def test_keep_semantic_demonstration():
     """Only test worthy of a comment, meant to show that we keep only up to the allowable number of epochs
@@ -58,10 +68,12 @@ def test_keep_semantic_demonstration():
     checkpointer = ModelCheckpointer(output_dir, "val_loss", logger, keep_old=keep_old_p)
     use_callback(checkpointer, n_test_epochs)
 
-    assert len(list(output_dir.iterdir())) == num_to_expect, f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+    assert (
+        len(list(output_dir.iterdir())) == num_to_expect
+    ), f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+
 
 def test_keep_everything():
-
     clean_up()
     keep_old_p = True
     n_test_epochs = 20
@@ -69,15 +81,18 @@ def test_keep_everything():
     checkpointer = ModelCheckpointer(output_dir, "val_loss", logger, keep_old=keep_old_p)
     use_callback(checkpointer, n_test_epochs)
 
-    assert len(list(output_dir.iterdir())) == num_to_expect, f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+    assert (
+        len(list(output_dir.iterdir())) == num_to_expect
+    ), f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
+
 
 def test_keep_only_best():
-
     clean_up()
     keep_old_p = False
     num_to_expect = 1
     checkpointer = ModelCheckpointer(output_dir, "val_loss", logger, keep_old=keep_old_p)
     use_callback(checkpointer, 10)
 
-    assert len(list(output_dir.iterdir())) == num_to_expect, f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"
-
+    assert (
+        len(list(output_dir.iterdir())) == num_to_expect
+    ), f"Should have {num_to_expect} files on disk for keep_old={keep_old_p}"

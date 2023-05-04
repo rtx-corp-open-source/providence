@@ -35,32 +35,35 @@ Speaking of, what happens to the metrics from the models trained on the non-root
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
+from time import time
 from typing import Callable
+
 import horovod.torch as hvd
 import mlflow
-from providence.datasets.core import DataSubsetId, ProvidenceDataset
+import torch as pt
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim import Adam
+
+import providence.nn.transformer.deepmind as dm
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets import BackblazeDataset
+from providence.datasets import BackblazeDatasets
+from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets.core import DataSubsetId
+from providence.datasets.core import ProvidenceDataset
 from providence.datasets.nasa import NasaDataset
 from providence.distributions import Weibull
-from providence.loss import ProvidenceLossInterface, discrete_weibull_loss_fn
+from providence.loss import discrete_weibull_loss_fn
+from providence.loss import ProvidenceLossInterface
 from providence.nn import ProvidenceGRU
 from providence.nn.module import ProvidenceModule
-import providence.nn.transformer.deepmind as dm
-import torch as pt
-from providence.datasets import BackblazeDataset, BackblazeDatasets
-from providence.datasets.adapters import BackblazeQuarter
-from providence.dataloaders import ProvidenceDataLoader
 from providence.paper_reproductions import GranularMetrics
-from providence.training import LossAggregates, unpack_label_and_censor
-from torch.optim import Adam
-from torch.nn.utils.clip_grad import clip_grad_norm_
-
-from time import time
-
-from providence_utils.mlflow import create_or_set_experiment
+from providence.training import LossAggregates
+from providence.training import unpack_label_and_censor
 from providence.type_utils import type_name
+from providence_utils.mlflow import create_or_set_experiment
 
-PYTORCH_DIR = '/dbfs/FileStore/AIML/scratch/Pytorch-Distributed/horovod_providence_pytorch'
+PYTORCH_DIR = "/dbfs/FileStore/AIML/scratch/Pytorch-Distributed/horovod_providence_pytorch"
 
 dm._DEBUG = False
 
@@ -68,25 +71,24 @@ from pathlib import Path
 
 
 def save_checkpoint(log_dir: Path, model: pt.nn.Module, optimizer: pt.optim.Optimizer, epoch: int):
-    filepath = log_dir / 'checkpoint-{epoch}.pth.tar'.format(epoch=epoch)
+    filepath = log_dir / "checkpoint-{epoch}.pth.tar".format(epoch=epoch)
     save_dict = {
-        'model': model,
-        'optimizer': optimizer.state_dict(), # state dict because optimizers are more recoverable
+        "model": model,
+        "optimizer": optimizer.state_dict(),  # state dict because optimizers are more recoverable
     }
     pt.save(save_dict, filepath)
 
 
 def load_checkpoint(log_dir: Path, epoch: int):
-    filepath = log_dir / 'checkpoint-{epoch}.pth.tar'.format(epoch=epoch)
+    filepath = log_dir / "checkpoint-{epoch}.pth.tar".format(epoch=epoch)
     return pt.load(filepath)
 
 
 def create_log_dir() -> Path:
-    log_dir = Path(PYTORCH_DIR, str(time()), 'MNISTDemo')
+    log_dir = Path(PYTORCH_DIR, str(time()), "MNISTDemo")
     log_dir.mkdir(parents=True)
     #   os.makedirs(log_dir)
     return log_dir
-
 
 
 def testing_basics():
@@ -98,7 +100,7 @@ def testing_basics():
     print(o)
     print(o.device)
 
-    print(pt.randn(1, device='cuda'))
+    print(pt.randn(1, device="cuda"))
 
 
 def get_train_set() -> ProvidenceDataset:
@@ -107,7 +109,7 @@ def get_train_set() -> ProvidenceDataset:
         quarter=BackblazeQuarter._2019_Q4,
         train_percentage=0.7,
         consider_validation=False,
-        data_dir="/dbfs/FileStore/datasets/providence"
+        data_dir="/dbfs/FileStore/datasets/providence",
     )
 
 
@@ -117,7 +119,7 @@ def get_test_set() -> ProvidenceDataset:
         quarter=BackblazeQuarter._2019_Q4,
         train_percentage=0.7,
         consider_validation=True,
-        data_dir="/dbfs/FileStore/datasets/providence"
+        data_dir="/dbfs/FileStore/datasets/providence",
     )
 
 
@@ -132,7 +134,7 @@ def epoch_training_pass(
 ):
     train_loss = pt.zeros(1, device=model.device)
     model.train()
-    for (feats, lengths, targets) in train_dl:
+    for feats, lengths, targets in train_dl:
         optimizer.zero_grad()
 
         outputs = model(feats.to(model.device), lengths)
@@ -161,8 +163,7 @@ def epoch_validation_pass(
 ):
     val_loss = pt.zeros(1, device=model.device)
     model.eval()
-    for (feats, lengths, targets) in validation_dl:
-
+    for feats, lengths, targets in validation_dl:
         outputs = model(feats.to(model.device), lengths)
         distribution_params = model_output_type(*outputs)
 
@@ -182,7 +183,13 @@ def epoch_validation_pass(
 _HVD_LOG_DIR = create_log_dir()
 
 
-def train_hvd(model_func: Callable[[int], ProvidenceModule], learning_rate: float, num_epochs: int, batch_size: int, momentum: float = 0.5):
+def train_hvd(
+    model_func: Callable[[int], ProvidenceModule],
+    learning_rate: float,
+    num_epochs: int,
+    batch_size: int,
+    momentum: float = 0.5,
+):
     from torch.utils.data.distributed import DistributedSampler
 
     dm._DEBUG = False
@@ -209,7 +216,7 @@ def train_hvd(model_func: Callable[[int], ProvidenceModule], learning_rate: floa
     model = model_func(n_model_features)
 
     # Pin GPU to be used to process local rank (one GPU per process)
-    model.device = pt.device(f'cuda:{hvd.local_rank()}')  # get the above device?
+    model.device = pt.device(f"cuda:{hvd.local_rank()}")  # get the above device?
     print(f"{model.device = }")
     model.to(model.device)
 
@@ -224,7 +231,6 @@ def train_hvd(model_func: Callable[[int], ProvidenceModule], learning_rate: floa
     hvd.broadcast_parameters(model.state_dict(), root_rank=0)
     hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 
-    
     validation_ds = get_test_set()
 
     for epoch in range(1, num_epochs + 1):
@@ -241,15 +247,24 @@ def train_hvd(model_func: Callable[[int], ProvidenceModule], learning_rate: floa
 
 
 def create_model(n_model_features: int) -> ProvidenceModule:
-    return dm.ProvidenceDeepMindTransformer(n_heads=2, n_layers=2, n_features_in=n_model_features, n_embedding=512, max_seq_len=1000)
-    
+    return dm.ProvidenceDeepMindTransformer(
+        n_heads=2,
+        n_layers=2,
+        n_features_in=n_model_features,
+        n_embedding=512,
+        max_seq_len=1000,
+    )
+
     return dm.ProvidenceBertTransformer(
-        n_heads=2, n_layers=2, n_features_in=n_model_features, n_embedding=64, max_seq_len=1000
+        n_heads=2,
+        n_layers=2,
+        n_features_in=n_model_features,
+        n_embedding=64,
+        max_seq_len=1000,
     )
 
 
 def main():
-
     print(f"{pt.__version__ = }")
     # hvd.init()
 
@@ -262,10 +277,12 @@ def main():
     start_time = datetime.now().isoformat()
 
     print(f"Run {run_index} started at:", start_time)
-    
-    with mlflow.start_run(experiment_id=create_or_set_experiment("/Users/40000889@azg.utccgl.com/TEST Providence Weibull-3")) as ml_run:
+
+    with mlflow.start_run(
+        experiment_id=create_or_set_experiment("/Users/40000889@azg.utccgl.com/TEST Providence Weibull-3")
+    ) as ml_run:
         start_perf_time = perf_counter()
-        run_params = { #yapf: skip
+        run_params = {  # yapf: skip
             "model_seed": pt.initial_seed(),
             "batch_size": 128,
             "dataset_name": "Backblaze",
@@ -303,5 +320,5 @@ def main():
     print(f"Performance clock says run took {end_perf_time - start_perf_time} seconds")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

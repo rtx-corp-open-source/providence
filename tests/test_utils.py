@@ -3,20 +3,22 @@
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
+from typing import List
+
 import numpy as np
 import pytest
 import torch as pt
-from typing import List
 
-from providence.dataloaders import providence_collate_fn, providence_pad_sequence
+from providence.dataloaders import providence_collate_fn
+from providence.dataloaders import providence_pad_sequence
 from providence.utils import multilevel_sort
 
+
 @pytest.fixture
-def list_of_tensors(n_devices: int = 5, n_features: int = 4, sequence_bounds = (10, 20)) -> List[pt.Tensor]:
+def list_of_tensors(n_devices: int = 5, n_features: int = 4, sequence_bounds=(10, 20)) -> List[pt.Tensor]:
     "Create five (devices|entities) (of n_features) with sequence lengths between sequence_bounds"
     tens = [
-        pt.rand(pt.randint(sequence_bounds[0], sequence_bounds[1], (1,)), n_features)
-        for _ in range(n_devices)
+        pt.rand(pt.randint(sequence_bounds[0], sequence_bounds[1], (1,)).item(), n_features) for _ in range(n_devices)
     ]
     return tens
 
@@ -29,7 +31,7 @@ class TestPadding:
         padded, lenghts = providence_pad_sequence(list_of_dataframes)
 
         for i in range(padded.size()[1]):
-            got = np.array(padded[:lenghts[i], i, :])
+            got = np.array(padded[: lenghts[i], i, :])
             want = list_of_dataframes[i]
             # need to use almost equal here since the Tensor <-> np.array can lead to floats
             # being slightly off
@@ -60,7 +62,7 @@ class TestPadding:
         padded, lenghts = providence_pad_sequence(list_of_tensors)
 
         for i in range(padded.size()[1]):
-            got = np.array(padded[:lenghts[i], i, :])
+            got = np.array(padded[: lenghts[i], i, :])
             want = list_of_tensors[i]
             # need to use almost equal here since the Tensor <-> np.array can lead to floats
             # being slightly off
@@ -119,17 +121,18 @@ class TestCollateFn:
 
         assert got == want
 
+
 class TestMultilevelCompare:
     @classmethod
     @pytest.fixture
     def example1(cls):
         return dict(a=12, b=7)
-    
+
     @classmethod
     @pytest.fixture
     def example2(cls):
         return dict(a=10, b=8)
-    
+
     @classmethod
     @pytest.fixture
     def example3(cls):
@@ -137,16 +140,30 @@ class TestMultilevelCompare:
 
     def test__standin_for_direct_comparison__key_a(self, example1: dict, example2: dict):
         result = multilevel_sort([example1, example2], keys=["a"])
-        assert [example2, example1] == result, "Multi-level compare is not a valid, drop-in replacement for direct comparison"
+        assert [
+            example2,
+            example1,
+        ] == result, "Multi-level compare is not a valid, drop-in replacement for direct comparison"
 
     def test__standin_for_direct_comparison__key_b(self, example1: dict, example2: dict):
         result = multilevel_sort([example1, example2], keys=["b"])
-        assert [example1, example2] == result, "Multi-level compare is not a valid, drop-in replacement for direct comparison"
+        assert [
+            example1,
+            example2,
+        ] == result, "Multi-level compare is not a valid, drop-in replacement for direct comparison"
 
     def test__standin_for_direct_sort__key_a(self, example1: dict, example2: dict, example3: dict):
         result = multilevel_sort([example1, example2, example3], keys=["a"])
-        assert [example3, example2, example1] == result, "Multi-level sort is not a valid, drop-in replacement for sort(ed)"
+        assert [
+            example3,
+            example2,
+            example1,
+        ] == result, "Multi-level sort is not a valid, drop-in replacement for sort(ed)"
 
     def test__standin_for_direct_sort__keys_a_and_b(self, example1: dict, example2: dict, example3: dict):
-        result = multilevel_sort([example1, example2, example3], keys="b a".split(' '))
-        assert [example3, example1, example2] == result, "Multi-level sort is not a valid, drop-in replacement for sort(ed)"
+        result = multilevel_sort([example1, example2, example3], keys="b a".split(" "))
+        assert [
+            example3,
+            example1,
+            example2,
+        ] == result, "Multi-level sort is not a valid, drop-in replacement for sort(ed)"

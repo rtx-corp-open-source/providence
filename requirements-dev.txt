@@ -5,12 +5,15 @@
 pre-commit
 
 # Testing
+pandas-stubs<2.0.0
 pytest
 pytest-cov
 pytest_mock
+pytest-mypy
 pytest-benchmark
 tox
 tox-pyenv
+types-requests
 
 # coverage
 coverage
@@ -21,6 +24,3 @@ pytest_cov
 
 # training new models
 seaborn
-
-# runtime tensor shape checking
-typeguard==2.13.3

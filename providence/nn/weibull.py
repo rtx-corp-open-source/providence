@@ -6,20 +6,27 @@ and felt we should adhere to better design principles when possible (e.g. avoid 
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 from typing import Tuple
-from torch import Tensor, exp, split
-from torch.nn import Module, LazyLinear, Linear, functional as F
+
+from torch import exp
+from torch import split
+from torch import Tensor
+from torch.nn import functional as F
+from torch.nn import LazyLinear
+from torch.nn import Linear
+from torch.nn import Module
 
 
 class WeibullActivation(Module):
-    """
-    Activation layer for a two parameter Weibull
+    """Activation layer for a two parameter Weibull.
 
-    :param input_size: The size of a network's last hidden layer
+    Args:
+        input_size (int): The number of input features to this module i.e. the size of a network's last hidden layer
 
-    :return: Alpha and Beta tensors for the Weibull distribution
+    Returns:
+        Alpha and Beta tensors for the Weibull distribution
     """
+
     def __init__(self, input_size: int):
         super().__init__()
         self.input_size: int = input_size
@@ -32,6 +39,14 @@ class WeibullActivation(Module):
         self.beta = Linear(self.input_size, self.output_size)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        """Map the input ``x`` (usually an embedding) to alpha, and beta tensors
+
+        Args:
+            x (Tensor): input tensor of rank 1 or more
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: alpha, beta Tensors of shape ``x.shape[:-1] + [1]``
+        """
         # taken from https://github.com/ragulpr/wtte-rnn/blob/162f5c17f21db79a316d563b60835d178142fd69/python/wtte/wtte.py#L31
 
         alpha = self.alpha(x)
@@ -44,14 +59,16 @@ class WeibullActivation(Module):
 
 
 class WeibullHead(Module):
-    """
-    Output head for a two parameter Weibull
+    """Output head for a two parameter Weibull
 
-    returns: Alpha and Beta tensors for the Weibull distribution
+    Follows after WeibullActivation, but uses LazyLinear to not depend on the dimensionality i.e. improve decoupling
+    w/o losing functionality
 
-    Follows after WeibullActivation, but uses LazyLinear to not depend on the dimensionality i.e. improve decoupling w/o losing functionality
+    Returns:
+        Alpha and Beta tensors for the Weibull distribution
     """
-    def __init__(self) -> 'WeibullHead':
+
+    def __init__(self) -> None:
         super().__init__()
         self.reset_parameters()
 
@@ -60,6 +77,14 @@ class WeibullHead(Module):
         self.beta_proj = LazyLinear(1, bias=True)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        """Map the input ``x`` (usually an embedding) to alpha, and beta tensors
+
+        Args:
+            x (Tensor): input tensor of rank 1 or more
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: alpha, beta Tensors of shape ``x.shape[:-1] + [1]``
+        """
         alpha_in = self.alpha_proj(x)
         beta_in = self.beta_proj(x)
         alpha = exp(alpha_in)
@@ -69,18 +94,18 @@ class WeibullHead(Module):
 
 
 class WeibullHead2(Module):
-    """
-    EXPERIMENTAL:
-    Output head for a two parameter Weibull
-
-    returns: Alpha and Beta tensors for the Weibull distribution
+    """EXPERIMENTAL: Output head for a two parameter Weibull
 
     Rather than `WeibullActivation`, output two regression targets from the same layer,
     then compute the Weibull values as desired.
 
     NOTE: idk if this is a useful approach, but I'm curious to test it out - especially as we're benchmarking
+
+    Returns:
+        Alpha and Beta tensors for the Weibull distribution
     """
-    def __init__(self) -> 'WeibullHead2':
+
+    def __init__(self) -> None:
         super().__init__()
         self.reset_parameters()
 
@@ -88,6 +113,14 @@ class WeibullHead2(Module):
         self.dense = LazyLinear(2, bias=True)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        """Map the input ``x`` (usually an embedding) to alpha, and beta tensors
+
+        Args:
+            x (Tensor): input tensor of rank 1 or more
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: alpha, beta Tensors of shape ``x.shape[:-1] + [1]``
+        """
         _2d_output = self.dense(x)
         # split(...)'s API is weird. We want segments of size=1, on the last dimension
         alpha_in, beta_in = split(_2d_output, 1, dim=-1)
@@ -96,16 +129,17 @@ class WeibullHead2(Module):
 
         return alpha, beta
 
+
 class Weibull3Head(Module):
+    """EXPERIMENTAL: Output head for the three-parameter Weibull
+
+    Follows after WeibullHead (see this module), but for the three-parameter Weibull model
+
+    returns:
+        Alpha, Beta, and K (translation / location) parameters-as-tensors for the Weibull distribution
     """
-    Output head for the three-parameter Weibull
-    
-    
-    returns: Alpha, Beta, and K (translation / location) parameters-as-tensors for the Weibull distribution
-    
-    Follows after WeibullHead (see this module), but with LazyLinear
-    """
-    def __init__(self) -> 'Weibull3Head':
+
+    def __init__(self) -> None:
         super().__init__()
         self.reset_parameters()
 
@@ -113,13 +147,21 @@ class Weibull3Head(Module):
         self.alpha_proj = LazyLinear(1, bias=True)
         self.beta_proj = LazyLinear(1, bias=True)
         self.k_proj = LazyLinear(1, bias=True)
-    
+
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        """Map the input ``x`` (usually an embedding) to alpha, beta, and k tensors
+
+        Args:
+            x (Tensor): input tensor of rank 1 or more
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: alpha, beta, k Tensors of shape ``x.shape[:-1] + [1]``
+        """
         alpha_in = self.alpha_proj(x)
         beta_in = self.beta_proj(x)
         k_in = self.k_proj(x)
 
         alpha = exp(alpha_in)
         beta = F.softplus(beta_in)
-        k = k_in
+        k = k_in  # NOTE: we must experiment with necessary controls for the translation parameter
         return alpha, beta, k

@@ -66,10 +66,13 @@ class TestWeibull:
         want = pt.tensor([0.3894])
 
         assert pt.allclose(got, want)
-    
+
     def test_likelihood_sequence_mixed_censor(self, y, weibull_params):
         test_seq_length = 5
-        new_params = Weibull.Params(weibull_params.alpha.tile(test_seq_length), weibull_params.beta.tile(test_seq_length))
+        new_params = Weibull.Params(
+            weibull_params.alpha.tile(test_seq_length),
+            weibull_params.beta.tile(test_seq_length),
+        )
         censor_indicator = pt.randint(0, 1, (5,), dtype=pt.float)
         got = Weibull.loglikelihood_discrete(new_params, y, censor_indicator)
         want = pt.where(censor_indicator.to(pt.bool), -25.0053, -30.25)

@@ -11,14 +11,19 @@ Author's note:
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 from pandas import concat
-from providence.datasets.adapters import NASA_FEATURE_NAMES, NasaTurbofanTest
+
 from providence.dataloaders import BasicDataloaders
-from providence.datasets import DataSubsetId, NasaFD00XDataset, ProvidenceDataset, train_test_split
-from providence.nn.module import ProvidenceLSTM
-from providence.training import generic_training, use_gpu_if_available
+from providence.datasets import DataSubsetId
+from providence.datasets import NasaFD00XDataset
+from providence.datasets import ProvidenceDataset
+from providence.datasets import train_test_split
+from providence.datasets.adapters import NASA_FEATURE_NAMES
+from providence.datasets.adapters import NasaTurbofanTest
+from providence.nn import ProvidenceLSTM
 from providence.paper_reproductions import NasaRnnOptimizer
+from providence.training import generic_training
+from providence.training import use_gpu_if_available
 
 "We created our own random fold by choosing a subset of the CMAPSS data (trainFD002 and trainFD004)"
 martinsson_ds = NasaFD00XDataset(NasaTurbofanTest.FD002, NasaTurbofanTest.FD004, subset_choice=DataSubsetId.Train)
@@ -44,7 +49,7 @@ def truncate_sequences(ds: ProvidenceDataset) -> ProvidenceDataset:
         feature_columns=ds.feature_columns,
         tte_column=ds.tte_column,
         event_indicator_column=ds.event_indicator_column,
-        device=ds.device
+        device=ds.device,
     )
 
 
@@ -59,7 +64,12 @@ train_ds, test_ds = train_test_split(martinsson_ds, split_percentage=training_pe
 dls = BasicDataloaders(train_ds, test_ds, batch_size=1)
 
 "LSTM was 26 x 100 x 10 x 2 ... i.e. the hidden state size was 100"
-model = ProvidenceLSTM(len(NASA_FEATURE_NAMES), hidden_size=100, num_layers=10, device=use_gpu_if_available())
+model = ProvidenceLSTM(
+    len(NASA_FEATURE_NAMES),
+    hidden_size=100,
+    num_layers=10,
+    device=use_gpu_if_available(),
+)
 
 "The model was trained for 60k iterations as shown in figure 4.3"
 optimizer = NasaRnnOptimizer(model)._replace(num_epochs=60_000)  # lots of epochs

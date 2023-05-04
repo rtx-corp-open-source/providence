@@ -7,7 +7,8 @@ from typing import Iterable
 
 import pytest
 
-from providence.datasets.utils import train_test_split_sizes, train_val_test_split_sizes
+from providence.datasets.utils import train_test_split_sizes
+from providence.datasets.utils import train_val_test_split_sizes
 
 
 @pytest.fixture
@@ -45,5 +46,3 @@ def test__train_val_test__standard_params(random_ints: Iterable[int], test_perce
         max_d, min_d = max(deltas), min(deltas)
         message += f"{max_d=}, {min_d=}"
     assert len(failures) == 0, message
-
-

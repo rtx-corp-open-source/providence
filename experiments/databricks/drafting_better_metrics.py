@@ -12,12 +12,18 @@ Test the more granual metrics
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 from pathlib import Path
-from providence.datasets.adapters import BackblazeQuarter, NasaTurbofanTest, load_nasa_dataframe, concat_dataframes
-from providence.training import LossAggregates, use_gpu_if_available
-from providence.datasets import BackblazeDataset, DataSubsetId
-from providence.paper_reproductions import GranularMetrics, NasaTransformer
+
+from providence.datasets import BackblazeDataset
+from providence.datasets import DataSubsetId
+from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets.adapters import concat_dataframes
+from providence.datasets.adapters import load_nasa_dataframe
+from providence.datasets.adapters import NasaTurbofanTest
+from providence.paper_reproductions import GranularMetrics
+from providence.paper_reproductions import NasaTransformer
+from providence.training import LossAggregates
+from providence.training import use_gpu_if_available
 from providence.utils import also
 
 # import torch as pt
@@ -49,11 +55,11 @@ PROVIDENCE_DATA_ROOT = "/dbfs/FileStore/datasets/providence"
 ################################################################################
 
 dbfs_out_path = also(
-    Path("/dbfs/FileStore/AIML/scratch/Providence-NASA-stats/"), lambda p: p.mkdir(parents=True, exist_ok=True)
+    Path("/dbfs/FileStore/AIML/scratch/Providence-NASA-stats/"),
+    lambda p: p.mkdir(parents=True, exist_ok=True),
 )
 
 for split_name in "train test".split():
-
     print(
         """
 ################################################################################
@@ -61,18 +67,21 @@ for split_name in "train test".split():
 # Assessing NASA Turbofan sizes: {}
 #
 ################################################################################
-    """.format(split_name.upper())
+    """.format(
+            split_name.upper()
+        )
     )
 
     for current_nasa_test in NasaTurbofanTest.all():
-
         fdooX_df = load_nasa_dataframe(current_nasa_test, split_name=split_name, data_root=PROVIDENCE_DATA_ROOT)
 
-        min_max_cycle_rul_by_unit_number = fdooX_df.groupby("unit number")[['RUL']].agg(['max', 'min'])
+        min_max_cycle_rul_by_unit_number = fdooX_df.groupby("unit number")[["RUL"]].agg(["max", "min"])
 
-        count_steps_by_unit_number = fdooX_df.groupby('unit number')["cycle"].count().rename('available_timesteps')
-        concat_dataframes((min_max_cycle_rul_by_unit_number, count_steps_by_unit_number),
-                          axis='columns').to_csv(dbfs_out_path / f"{current_nasa_test}_{split_name}-itemized.csv")
+        count_steps_by_unit_number = fdooX_df.groupby("unit number")["cycle"].count().rename("available_timesteps")
+        concat_dataframes(
+            (min_max_cycle_rul_by_unit_number, count_steps_by_unit_number),
+            axis="columns",
+        ).to_csv(dbfs_out_path / f"{current_nasa_test}_{split_name}-itemized.csv")
 
         rul_desc = fdooX_df["RUL"].describe()
         rul_desc.to_csv(dbfs_out_path / f"{current_nasa_test}_{split_name}-RUL.describe.csv")
@@ -80,6 +89,6 @@ for split_name in "train test".split():
         cycle_desc = fdooX_df["cycle"].describe()
         cycle_desc.to_csv(dbfs_out_path / f"{current_nasa_test}_{split_name}-cycle.describe.csv")
 
-        joint_desc = concat_dataframes((rul_desc, cycle_desc), axis='columns')
+        joint_desc = concat_dataframes((rul_desc, cycle_desc), axis="columns")
         print(f"{current_nasa_test}")
         print(joint_desc.to_markdown())

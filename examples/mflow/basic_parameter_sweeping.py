@@ -3,8 +3,11 @@
 Export controlled - see license file
 """
 import mlflow
+
 from providence.dataloaders import BasicDataloaders
-from providence.paper_reproductions import NasaDatasets, NasaTransformer, NasaTransformerOptimizer
+from providence.datasets import NasaDatasets
+from providence.paper_reproductions import NasaTransformer
+from providence.paper_reproductions import NasaTransformerOptimizer
 from providence.training import generic_training
 from providence_utils.hyperparameter_sweeper import HyperparameterSweeper
 
@@ -25,8 +28,8 @@ for sweep_params in sweeper.poll_sweeps():
 
         # set the learning rate through the PyTorch backdoor
         for group in opt.opt.param_groups:
-            group['lr'] = sweep_params['lr']
-        opt = opt._replace(batch_size=sweep_params['batch_size'])
+            group["lr"] = sweep_params["lr"]
+        opt = opt._replace(batch_size=sweep_params["batch_size"])
         # changes for these parameter sweeps
 
         dls = BasicDataloaders(train_ds, test_ds, batch_size=opt.batch_size)
@@ -37,6 +40,6 @@ for sweep_params in sweeper.poll_sweeps():
         mlflow.log_params(
             {
                 "final_training_loss": losses.training_losses[-1],
-                "final_validation_loss": losses.validation_losses[-1]
+                "final_validation_loss": losses.validation_losses[-1],
             }
         )

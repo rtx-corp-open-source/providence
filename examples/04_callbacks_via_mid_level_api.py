@@ -6,18 +6,22 @@ easier experimentation and future encapsulation.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 from logging import getLogger
 from pathlib import Path
 from typing import List
 
+from torch.optim import Adam
+
 from providence.dataloaders import BackblazeDataLoaders
 from providence.datasets.adapters import BackblazeQuarter
 from providence.paper_reproductions import BackblazeTransformer
-from providence.training import LossAggregates, OptimizerWrapper, training_epoch
+from providence.training import LossAggregates
+from providence.training import OptimizerWrapper
+from providence.training import training_epoch
 from providence.types import DataLoaders
-from providence_utils.callbacks import Callback, NthEpochLoggerCallback, check_before_epoch
-from torch.optim import Adam
+from providence_utils.callbacks import Callback
+from providence_utils.callbacks import check_before_epoch
+from providence_utils.callbacks import NthEpochLoggerCallback
 
 
 def callback_training(model, optimizer: OptimizerWrapper, dataloaders: DataLoaders, cbs: List[Callback]):
@@ -39,8 +43,8 @@ def callback_training(model, optimizer: OptimizerWrapper, dataloaders: DataLoade
     for cb in cbs:
         cb.after_training(current_epoch, model, optimizer.opt, losses, dataloaders)
 
-    dataloaders.to_device('cpu')
-    model.to('cpu')
+    dataloaders.to_device("cpu")
+    model.to("cpu")
     return loss_agg
 
 
@@ -49,23 +53,27 @@ logger = getLogger(__file__)
 output_dir = Path("./outputs")
 output_dir.mkdir(parents=True, exist_ok=True)
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     model = BackblazeTransformer()
     optimizer = OptimizerWrapper(Adam(model.parameters(), lr=1e-3), batch_size=128, num_epochs=3)
     backblaze_dls = BackblazeDataLoaders(quarter=BackblazeQuarter._2019_Q4, batch_size=optimizer.batch_size)
 
-    losses = callback_training(model, optimizer, backblaze_dls, [
-        NthEpochLoggerCallback(5, logger=logger),
-    ])
+    losses = callback_training(
+        model,
+        optimizer,
+        backblaze_dls,
+        [
+            NthEpochLoggerCallback(5, logger=logger),
+        ],
+    )
 
     # then do whatever you want with the losses, model and optimizer
     from matplotlib import pyplot as plt
 
     fig, ax = plt.subplots(figsize=(16, 12))
 
-    ax.plot(losses.training_losses, label='training')
-    ax.plot(losses.validation_losses, label='validation')
+    ax.plot(losses.training_losses, label="training")
+    ax.plot(losses.validation_losses, label="validation")
     ax.set_title("Training Losses")
     ax.legend()
 

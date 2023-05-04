@@ -5,36 +5,41 @@ In this example, multi-pass training epochs are such a 'novel' offering.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-import sys
-
-# sys.path.append('./')  # let us readily access providence.*
-
-from random import randint
-from typing import List, NamedTuple
-
+import sys  # noqa F401
 from pathlib import Path
+from random import randint
+from typing import List
+from typing import NamedTuple
 
 from providence.dataloaders import BackblazeDataLoaders
 from providence.datasets.adapters import BackblazeQuarter
-from providence.paper_reproductions import BackblazeTransformer, BackblazeTransformerOptimizer
-from providence.training import OptimizerWrapper, training_pass, validation_pass, use_gpu_if_available
+from providence.paper_reproductions import BackblazeTransformer
+from providence.paper_reproductions import BackblazeTransformerOptimizer
+from providence.training import OptimizerWrapper
+from providence.training import training_pass
+from providence.training import use_gpu_if_available
+from providence.training import validation_pass
 from providence.types import DataLoaders
+
+# sys.path.append('./')  # let us readily access providence.*
 
 model = BackblazeTransformer()
 optimizer = BackblazeTransformerOptimizer(model)
 backblaze_dls = BackblazeDataLoaders(quarter=BackblazeQuarter._2019_Q4, batch_size=optimizer.batch_size)
 
 
-def custom_training(model, optim: OptimizerWrapper, dataloaders: DataLoaders):
-    "perform multi-pass training before validating each epoch"
+class MultipassAggregates(NamedTuple):
+    training_losses: List[List[float]]
+    validation_losses: List[List[float]]
 
+
+def custom_training(model, optim: OptimizerWrapper, dataloaders: DataLoaders):
+    """Perform multi-pass training before validating each epoch"""
     maybe_gpu = use_gpu_if_available()
     model.to(maybe_gpu)
     dataloaders.to_device(maybe_gpu)
 
-    loss_agg = NamedTuple(
-        'MultipassAggregates', [('training_losses', List[List[float]]), ('validation_losses', List[float])]
-    )([], [])
+    loss_agg = MultipassAggregates([], [])
     n_passes = randint(1, 5)
 
     for _ in range(optimizer.num_epochs):
@@ -44,8 +49,8 @@ def custom_training(model, optim: OptimizerWrapper, dataloaders: DataLoaders):
         loss_agg.validation_losses.append(validation_loss)
 
     # send back to the CPU for metrics calculation
-    model.to('cpu')
-    dataloaders.to_device('cpu')
+    model.to("cpu")
+    dataloaders.to_device("cpu")
 
     return loss_agg
 
@@ -62,9 +67,9 @@ training_loss_means = []
 # scatterplot the multiple losses achieved of a given epoch, plotting their mean
 for x_tick, loss_set in enumerate(losses.training_losses):
     training_loss_means.append(loss_set.mean())
-    ax.scatter([x_tick] * len(loss_set), loss_set, color='b')
-ax.plot(training_loss_means, label='training')
-ax.plot(losses['validation'], label='validation')
+    ax.scatter([x_tick] * len(loss_set), loss_set, color="b")
+ax.plot(training_loss_means, label="training")
+ax.plot(losses["validation"], label="validation")
 
 ax.legend()
 

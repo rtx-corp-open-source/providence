@@ -12,7 +12,8 @@ from providence.nn.transformer.utils import make_bit_masking_tensor
 class TestMasking:
     """This test articulates the desired results of masking, as described in `test_no_offset()`.
     Effectively, we want to be able to mask on the outer-most dimension.
-    The print statements depict the Tensors' lifecycle, through input to the ideal output post-masking."""
+    The print statements depict the Tensors' lifecycle, through input to the ideal output post-masking.
+    """
 
     def test_no_offset(self):
         """
@@ -34,21 +35,25 @@ class TestMasking:
 
         # if I can reproduce the padding operation as a mathematical operation, I've definitely got a good mask
         # NOTE: this is the torch-implemented padding that should be much faster than our manual padding (even if we MIGHT have branch prediction)
-        desired_mask = pt.nn.utils.rnn.pad_sequence([
-            pt.ones(length_) for length_ in lengths
-        ], batch_first=False, padding_value=0)
+        desired_mask = pt.nn.utils.rnn.pad_sequence(
+            [pt.ones(length_) for length_ in lengths],
+            batch_first=False,
+            padding_value=0,
+        )
 
         print(f"Shapes: {tensor_in.shape = } {desired_mask.shape = }")
         print(f"{desired_mask.shape = }")
         print(f"{desired_mask.unsqueeze(2).shape = }")
-        masked = (tensor_in * desired_mask.unsqueeze(2))
+        masked = tensor_in * desired_mask.unsqueeze(2)
 
         assert masked.shape == tensor_in.shape, "Masking should be consistent in shape"
-        
+
         # we should expect all cells that aren't up to the longest-sequence-index to be zero
         expected_zero_count = sum([(longest_sequence - curr_length) * tensor_in.size(2) for curr_length in lengths])
         zero_count = (pt.zeros_like(tensor_in) == masked).sum().sum().item()
-        assert zero_count == expected_zero_count, "Should have zeroed out the elements that weren't supposed to be zeros"
+        assert (
+            zero_count == expected_zero_count
+        ), "Should have zeroed out the elements that weren't supposed to be zeros"
 
     def test_one_index__future_mask(self):
         """
@@ -63,7 +68,6 @@ class TestMasking:
         tensor_in = pt.randn(longest_sequence, n_devices, n_features)
         print(f"{tensor_in = }")
         lengths = [5, 2, 3]
-
 
         # need a faster way to do this, but masked_select and masked_fill definitely aren't it; they don't deal with indices.h
         # follow-up: this is fastest on CPU. Testing on GPU...
@@ -80,13 +84,17 @@ class TestMasking:
         print(f"Shapes: {tensor_in.shape = } {desired_mask.shape = }")
         print(f"{desired_mask.shape = }")
         print(f"{desired_mask.unsqueeze(2).shape = }")
-        masked = (tensor_in * desired_mask.unsqueeze(2))
+        masked = tensor_in * desired_mask.unsqueeze(2)
         print(f"{masked = }")
 
         assert masked.shape == tensor_in.shape, "Masking should be consistent in shape"
         masked_lengths = [length_ - mask_offset for length_ in lengths]
 
         # we should expect all cells that aren't up to the longest-sequence-index to be zero
-        expected_zero_count = sum([(longest_sequence - curr_length) * tensor_in.size(2) for curr_length in masked_lengths])
+        expected_zero_count = sum(
+            [(longest_sequence - curr_length) * tensor_in.size(2) for curr_length in masked_lengths]
+        )
         zero_count = (pt.zeros_like(tensor_in) == masked).sum().sum().item()
-        assert zero_count == expected_zero_count, "Should have zeroed out the elements that weren't supposed to be zeros"
+        assert (
+            zero_count == expected_zero_count
+        ), "Should have zeroed out the elements that weren't supposed to be zeros"

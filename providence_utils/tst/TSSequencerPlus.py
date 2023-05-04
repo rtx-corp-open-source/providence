@@ -8,7 +8,7 @@ courtesy of TSAI, pulled September 21st, 2022
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-__all__ = ['TSSequencerPlus', 'TSSequencer']
+__all__ = ["TSSequencerPlus", "TSSequencer"]
 
 # Cell
 from ..imports import *
@@ -18,38 +18,74 @@ from typing import Callable
 
 # Cell
 class _TSSequencerEncoderLayer(nn.Module):
-    def __init__(self, d_model:int, q_len:int=None, lstm_dropout:float=0., dropout:float=0, drop_path_rate:float=0.,
-                 mlp_ratio:int=1, lstm_bias:bool=True, act:str='gelu', pre_norm:bool=False):
+    def __init__(
+        self,
+        d_model: int,
+        q_len: int = None,
+        lstm_dropout: float = 0.0,
+        dropout: float = 0,
+        drop_path_rate: float = 0.0,
+        mlp_ratio: int = 1,
+        lstm_bias: bool = True,
+        act: str = "gelu",
+        pre_norm: bool = False,
+    ):
         super().__init__()
         self.bilstm = nn.LSTM(q_len, q_len, num_layers=1, bidirectional=True, bias=lstm_bias)
         self.dropout = nn.Dropout(lstm_dropout)
         self.fc = nn.Linear(2 * q_len, q_len)
         self.lstm_norm = nn.LayerNorm(d_model)
-        self.pwff =  PositionwiseFeedForward(d_model, dropout=dropout, act=act, mlp_ratio=mlp_ratio)
+        self.pwff = PositionwiseFeedForward(d_model, dropout=dropout, act=act, mlp_ratio=mlp_ratio)
         self.ff_norm = nn.LayerNorm(d_model)
         self.drop_path = DropPath(drop_path_rate) if drop_path_rate != 0 else nn.Identity()
         self.pre_norm = pre_norm
-        self.transpose = Transpose(1,2)
+        self.transpose = Transpose(1, 2)
 
     def forward(self, x):
         if self.pre_norm:
-            x = self.drop_path(self.dropout(self.transpose(self.fc(self.bilstm(self.transpose(self.lstm_norm(x)))[0])))) + x
+            x = (
+                self.drop_path(self.dropout(self.transpose(self.fc(self.bilstm(self.transpose(self.lstm_norm(x)))[0]))))
+                + x
+            )
             x = self.drop_path(self.pwff(self.ff_norm(x))) + x
         else:
-            x = self.lstm_norm(self.drop_path(self.dropout(self.transpose(self.fc(self.bilstm(self.transpose(x))[0])))) + x)
+            x = self.lstm_norm(
+                self.drop_path(self.dropout(self.transpose(self.fc(self.bilstm(self.transpose(x))[0])))) + x
+            )
             x = self.ff_norm(self.drop_path(self.pwff(x)) + x)
         return x
 
+
 # Cell
 class _TSSequencerEncoder(nn.Module):
-    def __init__(self, d_model, depth:int=6, q_len:int=None, lstm_dropout:float=0., dropout:float=0, drop_path_rate:float=0.,
-                 mlp_ratio:int=1, lstm_bias:bool=True, act:str='gelu', pre_norm:bool=False):
+    def __init__(
+        self,
+        d_model,
+        depth: int = 6,
+        q_len: int = None,
+        lstm_dropout: float = 0.0,
+        dropout: float = 0,
+        drop_path_rate: float = 0.0,
+        mlp_ratio: int = 1,
+        lstm_bias: bool = True,
+        act: str = "gelu",
+        pre_norm: bool = False,
+    ):
         super().__init__()
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
         layers = []
         for i in range(depth):
-            layer = _TSSequencerEncoderLayer(d_model, q_len=q_len, lstm_dropout=lstm_dropout, dropout=dropout, drop_path_rate=dpr[i],
-                                      mlp_ratio=mlp_ratio, lstm_bias=lstm_bias, act=act, pre_norm=pre_norm)
+            layer = _TSSequencerEncoderLayer(
+                d_model,
+                q_len=q_len,
+                lstm_dropout=lstm_dropout,
+                dropout=dropout,
+                drop_path_rate=dpr[i],
+                mlp_ratio=mlp_ratio,
+                lstm_bias=lstm_bias,
+                act=act,
+                pre_norm=pre_norm,
+            )
             layers.append(layer)
         self.encoder = nn.Sequential(*layers)
         self.norm = nn.LayerNorm(d_model) if pre_norm else nn.Identity()
@@ -59,20 +95,41 @@ class _TSSequencerEncoder(nn.Module):
         x = self.norm(x)
         return x
 
+
 # Cell
 class _TSSequencerBackbone(Module):
-    def __init__(self, c_in:int, seq_len:int, depth:int=6, d_model:int=128, act:str='gelu',
-                 lstm_bias:bool=True, lstm_dropout:float=0., dropout:float=0., drop_path_rate:float=0., mlp_ratio:int=1,
-                 pre_norm:bool=False, use_token:bool=True,  use_pe:bool=True, n_cat_embeds:Optional[list]=None, cat_embed_dims:Optional[list]=None,
-                 cat_padding_idxs:Optional[list]=None, cat_pos:Optional[list]=None, feature_extractor:Optional[Callable]=None,
-                 token_size:int=None, tokenizer:Optional[Callable]=None):
+    def __init__(
+        self,
+        c_in: int,
+        seq_len: int,
+        depth: int = 6,
+        d_model: int = 128,
+        act: str = "gelu",
+        lstm_bias: bool = True,
+        lstm_dropout: float = 0.0,
+        dropout: float = 0.0,
+        drop_path_rate: float = 0.0,
+        mlp_ratio: int = 1,
+        pre_norm: bool = False,
+        use_token: bool = True,
+        use_pe: bool = True,
+        n_cat_embeds: Optional[list] = None,
+        cat_embed_dims: Optional[list] = None,
+        cat_padding_idxs: Optional[list] = None,
+        cat_pos: Optional[list] = None,
+        feature_extractor: Optional[Callable] = None,
+        token_size: int = None,
+        tokenizer: Optional[Callable] = None,
+    ):
 
         # Categorical embeddings
         if n_cat_embeds is not None:
             n_cat_embeds = listify(n_cat_embeds)
             if cat_embed_dims is None:
                 cat_embed_dims = [emb_sz_rule(s) for s in n_cat_embeds]
-            self.to_cat_embed = MultiEmbedding(c_in, n_cat_embeds, cat_embed_dims=cat_embed_dims, cat_padding_idxs=cat_padding_idxs, cat_pos=cat_pos)
+            self.to_cat_embed = MultiEmbedding(
+                c_in, n_cat_embeds, cat_embed_dims=cat_embed_dims, cat_padding_idxs=cat_padding_idxs, cat_pos=cat_pos
+            )
             c_in, seq_len = output_size_calculator(self.to_cat_embed, c_in, seq_len)
         else:
             self.to_cat_embed = nn.Identity()
@@ -82,16 +139,20 @@ class _TSSequencerBackbone(Module):
             self.tokenizer = SeqTokenizer(c_in, d_model, token_size)
             c_in, seq_len = output_size_calculator(self.tokenizer, c_in, seq_len)
         elif tokenizer is not None:
-            if isinstance(tokenizer, nn.Module):  self.tokenizer = tokenizer
-            else: self.tokenizer = tokenizer(c_in, d_model)
+            if isinstance(tokenizer, nn.Module):
+                self.tokenizer = tokenizer
+            else:
+                self.tokenizer = tokenizer(c_in, d_model)
             c_in, seq_len = output_size_calculator(self.tokenizer, c_in, seq_len)
         else:
             self.tokenizer = nn.Identity()
 
         # Feature extractor
         if feature_extractor is not None:
-            if isinstance(feature_extractor, nn.Module):  self.feature_extractor = feature_extractor
-            else: self.feature_extractor = feature_extractor(c_in, d_model)
+            if isinstance(feature_extractor, nn.Module):
+                self.feature_extractor = feature_extractor
+            else:
+                self.feature_extractor = feature_extractor(c_in, d_model)
             c_in, seq_len = output_size_calculator(self.feature_extractor, c_in, seq_len)
         else:
             self.feature_extractor = nn.Identity()
@@ -102,7 +163,7 @@ class _TSSequencerBackbone(Module):
         else:
             self.linear_proj = nn.Identity()
 
-        self.transpose = Transpose(1,2)
+        self.transpose = Transpose(1, 2)
 
         # Position embedding & token
         if use_pe:
@@ -113,9 +174,18 @@ class _TSSequencerBackbone(Module):
         self.emb_dropout = nn.Dropout(dropout)
 
         # Encoder
-        self.encoder = _TSSequencerEncoder(d_model, depth=depth, q_len=seq_len + use_token, lstm_bias=lstm_bias,
-                                         lstm_dropout=lstm_dropout, dropout=dropout,
-                                         mlp_ratio=mlp_ratio, drop_path_rate=drop_path_rate, act=act, pre_norm=pre_norm)
+        self.encoder = _TSSequencerEncoder(
+            d_model,
+            depth=depth,
+            q_len=seq_len + use_token,
+            lstm_bias=lstm_bias,
+            lstm_dropout=lstm_dropout,
+            dropout=dropout,
+            mlp_ratio=mlp_ratio,
+            drop_path_rate=drop_path_rate,
+            act=act,
+            pre_norm=pre_norm,
+        )
 
     def forward(self, x):
 
@@ -135,7 +205,9 @@ class _TSSequencerBackbone(Module):
         x = self.transpose(x)
         if self.use_pe:
             x = x + self.pos_embed
-        if self.use_token: # token is concatenated after position embedding so that embedding can be learned using self.supervised learning
+        if (
+            self.use_token
+        ):  # token is concatenated after position embedding so that embedding can be learned using self.supervised learning
             x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
         x = self.emb_dropout(x)
 
@@ -143,8 +215,9 @@ class _TSSequencerBackbone(Module):
         x = self.encoder(x)
 
         # Output
-        x = x.transpose(1,2)
+        x = x.transpose(1, 2)
         return x
+
 
 # Cell
 class TSSequencerPlus(nn.Sequential):
@@ -193,22 +266,63 @@ class TSSequencerPlus(nn.Sequential):
         x: bs (batch size) x nvars (aka features, variables, dimensions, channels) x seq_len (aka time steps)
     """
 
-    def __init__(self, c_in:int, c_out:int, seq_len:int, d_model:int=128, depth:int=6, act:str='gelu',
-                 lstm_dropout:float=0., dropout:float=0., drop_path_rate:float=0., mlp_ratio:int=1, lstm_bias:bool=True,
-                 pre_norm:bool=False, use_token:bool=True, use_pe:bool=True,
-                 cat_pos:Optional[list]=None, n_cat_embeds:Optional[list]=None, cat_embed_dims:Optional[list]=None, cat_padding_idxs:Optional[list]=None,
-                 token_size:int=None, tokenizer:Optional[Callable]=None, feature_extractor:Optional[Callable]=None,
-                 flatten:bool=False, concat_pool:bool=True, fc_dropout:float=0., use_bn:bool=False,
-                 bias_init:Optional[Union[float, list]]=None, y_range:Optional[tuple]=None, custom_head:Optional[Callable]=None, verbose:bool=True):
+    def __init__(
+        self,
+        c_in: int,
+        c_out: int,
+        seq_len: int,
+        d_model: int = 128,
+        depth: int = 6,
+        act: str = "gelu",
+        lstm_dropout: float = 0.0,
+        dropout: float = 0.0,
+        drop_path_rate: float = 0.0,
+        mlp_ratio: int = 1,
+        lstm_bias: bool = True,
+        pre_norm: bool = False,
+        use_token: bool = True,
+        use_pe: bool = True,
+        cat_pos: Optional[list] = None,
+        n_cat_embeds: Optional[list] = None,
+        cat_embed_dims: Optional[list] = None,
+        cat_padding_idxs: Optional[list] = None,
+        token_size: int = None,
+        tokenizer: Optional[Callable] = None,
+        feature_extractor: Optional[Callable] = None,
+        flatten: bool = False,
+        concat_pool: bool = True,
+        fc_dropout: float = 0.0,
+        use_bn: bool = False,
+        bias_init: Optional[Union[float, list]] = None,
+        y_range: Optional[tuple] = None,
+        custom_head: Optional[Callable] = None,
+        verbose: bool = True,
+    ):
 
         if use_token and c_out == 1:
             use_token = False
             pv("use_token set to False as c_out == 1", verbose)
-        backbone = _TSSequencerBackbone(c_in, seq_len, depth=depth, d_model=d_model, act=act,
-                                      lstm_dropout=lstm_dropout, dropout=dropout, drop_path_rate=drop_path_rate,
-                                      pre_norm=pre_norm, mlp_ratio=mlp_ratio, use_pe=use_pe, use_token=use_token,
-                                      n_cat_embeds=n_cat_embeds, cat_embed_dims=cat_embed_dims, cat_padding_idxs=cat_padding_idxs, cat_pos=cat_pos,
-                                      feature_extractor=feature_extractor, token_size=token_size, tokenizer=tokenizer)
+        backbone = _TSSequencerBackbone(
+            c_in,
+            seq_len,
+            depth=depth,
+            d_model=d_model,
+            act=act,
+            lstm_dropout=lstm_dropout,
+            dropout=dropout,
+            drop_path_rate=drop_path_rate,
+            pre_norm=pre_norm,
+            mlp_ratio=mlp_ratio,
+            use_pe=use_pe,
+            use_token=use_token,
+            n_cat_embeds=n_cat_embeds,
+            cat_embed_dims=cat_embed_dims,
+            cat_padding_idxs=cat_padding_idxs,
+            cat_pos=cat_pos,
+            feature_extractor=feature_extractor,
+            token_size=token_size,
+            tokenizer=tokenizer,
+        )
 
         self.head_nf = d_model
         self.c_out = c_out
@@ -216,8 +330,10 @@ class TSSequencerPlus(nn.Sequential):
 
         # Head
         if custom_head:
-            if isinstance(custom_head, nn.Module): head = custom_head
-            else: head = custom_head(self.head_nf, c_out, seq_len)
+            if isinstance(custom_head, nn.Module):
+                head = custom_head
+            else:
+                head = custom_head(self.head_nf, c_out, seq_len)
         else:
             nf = d_model
             layers = []
@@ -227,21 +343,27 @@ class TSSequencerPlus(nn.Sequential):
                 layers += [Reshape(-1)]
                 nf = nf * seq_len
             else:
-                if concat_pool: nf *= 2
+                if concat_pool:
+                    nf *= 2
                 layers = [GACP1d(1) if concat_pool else GAP1d(1)]
-            if use_bn: layers += [nn.BatchNorm1d(nf)]
-            if fc_dropout: layers += [nn.Dropout(fc_dropout)]
+            if use_bn:
+                layers += [nn.BatchNorm1d(nf)]
+            if fc_dropout:
+                layers += [nn.Dropout(fc_dropout)]
 
             # Last layer
             linear = nn.Linear(nf, c_out)
             if bias_init is not None:
-                if isinstance(bias_init, float): nn.init.constant_(linear.bias, bias_init)
-                else: linear.bias = nn.Parameter(torch.as_tensor(bias_init, dtype=torch.float32))
+                if isinstance(bias_init, float):
+                    nn.init.constant_(linear.bias, bias_init)
+                else:
+                    linear.bias = nn.Parameter(torch.as_tensor(bias_init, dtype=torch.float32))
             layers += [linear]
 
-            if y_range: layers += [SigmoidRange(*y_range)]
+            if y_range:
+                layers += [SigmoidRange(*y_range)]
             head = nn.Sequential(*layers)
-        super().__init__(OrderedDict([('backbone', backbone), ('head', head)]))
+        super().__init__(OrderedDict([("backbone", backbone), ("head", head)]))
 
 
 TSSequencer = TSSequencerPlus

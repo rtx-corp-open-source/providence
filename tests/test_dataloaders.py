@@ -3,18 +3,21 @@
 Export controlled - see license file
 """
 from typing import Tuple
-import pytest
-from torch import device
-from providence.datasets.adapters import NasaTurbofanTest
 
-from providence.datasets import ProvidenceDataset, NasaFD00XDatasets
-from providence.dataloaders import DataLoaders, ProvidenceDataLoader
+import pytest
+
+from providence.dataloaders import DataLoaders
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets import NasaFD00XDatasets
+from providence.datasets import ProvidenceDataset
+from providence.datasets.adapters import NasaTurbofanTest
 
 
 def NasaFD001Datasets() -> Tuple[ProvidenceDataset, ProvidenceDataset]:
     return NasaFD00XDatasets(NasaTurbofanTest.FD001)
 
 
+@pytest.mark.requires_data
 class TestDataLoadersWrapper:
     @pytest.fixture
     def nasa_example(self) -> DataLoaders:
@@ -54,10 +57,13 @@ class TestDataLoadersWrapper:
     #     assert_ds_is_on_device(nasa_example.validation.dataset, test_device)
 
 
+@pytest.mark.requires_data
 def test_num_features():
     train_ds, test_ds = NasaFD001Datasets()
     train_dl, test_dl = ProvidenceDataLoader(train_ds), ProvidenceDataLoader(test_ds)
 
     from providence.datasets.adapters import NASA_FEATURE_NAMES
-    assert train_dl.num_features == test_dl.num_features == len(NASA_FEATURE_NAMES), 'Number of features should be ' \
-                                                                                     'identical throughout '
+
+    assert train_dl.num_features == test_dl.num_features == len(NASA_FEATURE_NAMES), (
+        "Number of features should be " "identical throughout "
+    )

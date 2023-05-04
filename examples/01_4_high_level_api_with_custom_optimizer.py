@@ -4,17 +4,18 @@ This example shows that only three lines of code need to change to facilitate a 
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 from pathlib import Path
 
-from providence.datasets.adapters import BackblazeQuarter
-from providence.dataloaders import BackblazeDataLoaders
-from providence.training import OptimizerWrapper
-from providence.paper_reproductions import BackblazeTraining, BackblazeTransformer
 from torch.optim import Adam
 
+from providence.dataloaders import BackblazeDataLoaders
+from providence.datasets.adapters import BackblazeQuarter
+from providence.paper_reproductions import BackblazeTraining
+from providence.paper_reproductions import BackblazeTransformer
+from providence.training import OptimizerWrapper
+
 model = BackblazeTransformer()
-optimizer = OptimizerWrapper( # use the wrapper so it can store these useful things
+optimizer = OptimizerWrapper(  # use the wrapper so it can store these useful things
     Adam(model.parameters(), lr=1e-3), batch_size=128, num_epochs=3
 )
 # alternatively, you can do something like the following:
@@ -30,8 +31,8 @@ from matplotlib import pyplot as plt
 
 fig, ax = plt.subplots(figsize=(16, 12))
 
-ax.plot(losses.training_losses, label='training')
-ax.plot(losses.validation_losses, label='validation')
+ax.plot(losses.training_losses, label="training")
+ax.plot(losses.validation_losses, label="validation")
 ax.set_title("Training Losses")
 ax.legend()
 

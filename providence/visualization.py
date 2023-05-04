@@ -6,27 +6,34 @@ Usage is explained at the function level.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-from contextlib import AbstractContextManager
-from typing import Callable, Union
 import random
+from contextlib import AbstractContextManager
+from typing import Any
+from typing import Callable
+from typing import Iterator
+from typing import List
+from typing import Literal
+from typing import Tuple
+from typing import Union
 
 import numpy as np
 import pandas as pd
 import torch as pt
-from providence.datasets import ProvidenceDataset
-
-from providence.distributions import Weibull
+from matplotlib import pyplot as plt
 
 from .utils import logger
-
-from providence.metrics import FleetType, MetricsCalculator, SDist as Distribution
+from providence.datasets import ProvidenceDataset
+from providence.distributions import Weibull
+from providence.metrics import FleetType
+from providence.metrics import MetricsCalculator
+from providence.metrics import SDist as Distribution
 from providence.metrics import smpe
 
 
-
 class _ShimRotorContext(AbstractContextManager):
-    def __exit__(self, __exc_type, __exc_value, __traceback) -> bool:
-        return False  # Because we don't want suppress exceptions, we return false
+    def __exit__(self, __exc_type, __exc_value, __traceback) -> Literal[False]:
+        # Because we don't want suppress exceptions, we return false
+        return False
 
 
 class WarnOnce:
@@ -45,17 +52,18 @@ warn_about_mpl_import = WarnOnce(
 )
 
 
-def check_for_mpl(rotor_config: dict = {}):
+def check_for_mpl(rotor_config: dict = None):
     """Makes sure matplotlib and rotor_plot can be imported.
-    Parameters
-    ----------
-    rotor_config : dict
-        A dictionary containing kwargs to pass to the rotor context for plot styling (theme, dark, high_contrast, and palette).
-    Returns
-    -------
-    plt : `matplotlib.pyplot`
-    ctx : :class:`RotorContext`
+    Args:
+        rotor_config (dict): A dictionary containing kwargs to pass to the rotor context for plot styling
+            (theme, dark, high_contrast, and palette).
+
+    Returns:
+        Tuple[plt, ctx, sns]: ``plt`` being ``matplotlib.pyplot``, ``ctx`` being ``RotorContext`` or None, and ``sns``
+            being the Seaborn package
     """
+    if rotor_config is None:
+        rotor_config = {}
     try:
         import matplotlib.pyplot as plt
     except ImportError as e:
@@ -85,20 +93,23 @@ def check_for_mpl(rotor_config: dict = {}):
 
 
 def plot_weibull(
-    alpha: pt.Tensor, beta: pt.Tensor, tte: pt.Tensor, max_time: int = 500, title: str = None, palette="RdBu_r",
+    alpha: pt.Tensor,
+    beta: pt.Tensor,
+    tte: pt.Tensor,
+    max_time: int = 500,
+    title: str = None,
+    palette="RdBu_r",
     *,
     verbose: bool = False,
     draw_guideline: bool = False,
-) -> None:
-    """
-    Plot Weibull distributions over time
+) -> Tuple[plt.Figure, Union[plt.Axes, List[plt.Axes], np.ndarray]]:
+    """Plot Weibull distributions over time.
 
-    :param alpha: Weibull alpha parameter
-    :param beta: Weibull beta parameter
-    :param tte: Tensor of time until event values
-    :param max_time: Maximim time value to plot
-
-    :return: None
+    Args:
+        alpha (pt.Tensor): Weibull alpha parameter
+        beta (pt.Tensor): Weibull beta parameter
+        tte (pt.Tensor): Tensor of time until event values
+        max_time (int): Maximim time value to plot
     """
     # Get color palette
     plt, ctx, sns = check_for_mpl()
@@ -114,7 +125,6 @@ def plot_weibull(
 
     fig, ax = plt.subplots(1, figsize=(20, 20))
 
-
     with ctx:
         # Loop through the tensor values and plot the distribution over t, mode, and actual time of failure
         for i in range(0, alpha.shape[0]):
@@ -122,7 +132,7 @@ def plot_weibull(
                 color = color_dict[i]
                 pdf = Weibull.pdf(Weibull.Params(alpha[i], beta[i]), t)
                 dot_location = [int(tte_array[i])]
-                if draw_guideline: # draw to the peak of the curve, which is our prediction.
+                if draw_guideline:  # draw to the peak of the curve, which is our prediction.
                     ax.vlines(modes[i], ymin=0, ymax=max(pdf), colors=color, linestyles=":")
                 ax.plot(pdf, color=color)
                 # bold dot on the curve, representing "actual". Ideally, the peak of the curve is under the dot.
@@ -140,7 +150,21 @@ def plot_weibull(
     return fig, ax
 
 
-def make_error_plot(predicted_tte: Union[np.ndarray, pd.Series], actual_tte: Union[np.ndarray, pd.Series], kind="reg"):
+def make_error_plot(
+    predicted_tte: Union[np.ndarray, pd.Series],
+    actual_tte: Union[np.ndarray, pd.Series],
+    kind="reg",
+):
+    """Draw an Seaborn jointplot between ``predicted_tte`` and ``actual_tte``.
+
+    Args:
+        predicted_tte (Union[np.ndarray, pd.Series]): predictions from a model
+        actual_tte (Union[np.ndarray, pd.Series]): ground truth time-to-event
+        kind (str, optional): regression ("reg") or kernel density estimate ("kde"). Defaults to "reg".
+
+    Returns:
+        Any: the return value of ``sns.jointplot``
+    """
     plt, rotor_context, sns = check_for_mpl()
     plt.figure()  # need to reset the figure reference in the global scope because Seaborn is LAAAAAZZZZYYYY and reuses them.
 
@@ -152,7 +176,8 @@ def make_error_plot(predicted_tte: Union[np.ndarray, pd.Series], actual_tte: Uni
             y=actual_tte,
             kind=kind,
         )
-    grid.set_axis_labels(f"Predicted TTE ({predicted_tte.name})", "Actual TTE")
+    if isinstance(predicted_tte, pd.Series):
+        grid.set_axis_labels(f"Predicted TTE ({predicted_tte.name})", "Actual TTE")
     grid.fig.suptitle("Predicted vs. Actual TTE", y=1)
 
     return grid
@@ -160,15 +185,18 @@ def make_error_plot(predicted_tte: Union[np.ndarray, pd.Series], actual_tte: Uni
 
 def plot_mse_by_timestep(
     calc: MetricsCalculator,
-    max_timestep: float,
-    min_timestep: float,
+    max_timestep: int,
+    min_timestep: int,
 ):
-    """
-    Plot MSE for the fleet at each timestep in a given window
+    """Plot MSE for the fleet at each timestep in a given window.
 
-    :param calc: Metrics calculator, which has a caching computation for the error_by_timestep
-    :param max_timestep: maximum timestep of desired window
-    :param min_timestep: minimum timestep of desired window
+    Args:
+        calc (MetricsCalculator): used for caching computation for the ``error_by_timestep``
+        max_timestep (int): maximum timestep of desired window
+        min_timestep (int): minimum timestep of desired window
+
+    Returns:
+        plt.Axes: axis drawn on to visualize the MSE over time
     """
     plt, rotor_context, sns = check_for_mpl()
 
@@ -189,15 +217,18 @@ def plot_mse_by_timestep(
 
 def plot_mfe_by_timestep(
     calc: MetricsCalculator,
-    max_timestep: float,
-    min_timestep: float,
+    max_timestep: int,
+    min_timestep: int,
 ):
-    """
-    Plot MFE for the fleet at each timestep in a given window
+    """Plot MFE for the fleet at each timestep in a given window.
 
-    :param calc: Metrics calculator, which has a caching computation for the error_by_timestep
-    :param max_timestep: maximum timestep of desired window
-    :param min_timestep: minimum timestep of desired window
+    Args:
+        calc (MetricsCalculator): used for caching computation for the ``error_by_timestep``
+        max_timestep (int): maximum timestep of desired window
+        min_timestep (int): minimum timestep of desired window
+
+    Returns:
+        plt.Axes: axis drawn on to visualize the MFE over time
     """
     plt, rotor_context, sns = check_for_mpl()
 
@@ -218,12 +249,13 @@ def plot_mfe_by_timestep(
 
 def scatterplot_overshoot(
     calc: MetricsCalculator,
-    max_timestep: float,
-    min_timestep: float,
+    max_timestep: int,
+    min_timestep: int,
     *,
-    stat: str = "mode"
+    stat: str = "mode",
 ):
-    """
+    """Draw the percentage of predictions overshooting the actual TTE at each timestep.
+
     When the mean of the output distribution is used as the predicted TTE, this plot
     shows the percentage of predictions overshooting the actual TTE at each timestep.
 
@@ -235,15 +267,17 @@ def scatterplot_overshoot(
 
     You will also want to see few extreme overshoots, otherwise you might have a problem with model capacity and/or over-regularization
 
-    :param calc: Metrics calculator, which has a caching computation for the error_by_timestep
-    :param max_timestep: maximum timestep of desired window.
-    :param min_timestep: minimum timestep of desired window
-    
-    Keyword arguments:
-    :param stat: stat in {mean, median, mode}
+    Args:
+        calc (MetricsCalculator): used for caching computation for the ``error_by_timestep``
+        max_timestep (int): maximum timestep of desired window
+        min_timestep (int): minimum timestep of desired window
+        stat (str, optional): average statistic to use for the error computation. Defaults to "mode".
+
+    Returns:
+        plt.Axes: axis drawn on to visualize the MSE over time
     """
     assert stat in {"mean", "median", "mode"}
-    
+
     plt, rotor_context, sns = check_for_mpl()
 
     error_key = f"error_{stat}"
@@ -255,7 +289,11 @@ def scatterplot_overshoot(
     plt.figure()
 
     with rotor_context:
-        ax = sns.scatterplot(x=error_by_ts["tte"], y=error_by_ts[error_key], hue=error_by_ts[overshoot_key])
+        ax = sns.scatterplot(
+            x=error_by_ts["tte"],
+            y=error_by_ts[error_key],
+            hue=error_by_ts[overshoot_key],
+        )
         ax.legend(loc="upper right", title="Overshoot")
         ax.set_xlabel("Actual TTE")
         ax.set_ylabel("Prediction Error (Mean of Distribution)")
@@ -266,22 +304,29 @@ def scatterplot_overshoot(
 
 def plot_percent_overshot_by_tte(
     calc: MetricsCalculator,
-    max_timestep: float,
-    min_timestep: float,
+    max_timestep: int,
+    min_timestep: int,
 ):
-    """
-    Plot the percentage of predictions which have overshot actual TTE at each
-    timestep for mean, median, and mode.
+    """Plot the percentage of predictions which have overshot actual TTE at each timestep for mean, median, and mode.
 
-    :param calc: Metrics calculator, which has a caching computation for the error_by_timestep
-    :param max_timestep: maximum timestep of desired window
-    :param min_timestep: minimum timestep of desired window
+    Args:
+        calc (MetricsCalculator): used for caching computation for the ``error_by_timestep``
+        max_timestep (int): maximum timestep of desired window
+        min_timestep (int): minimum timestep of desired window
+
+    Returns:
+        plt.Axes: axis on which the visualization was drawn.
     """
     plt, rotor_context, sns = check_for_mpl()
 
     overshot = calc.percent_overshot_by_tte(max_timestep=max_timestep, min_timestep=min_timestep)
 
-    df = pd.melt(overshot, id_vars=["TTE"], value_vars=["%_Overshot_Mean", "%_Overshot_Median", "%_Overshot_Mode"], var_name="Measures")
+    df = pd.melt(
+        overshot,
+        id_vars=["TTE"],
+        value_vars=["%_Overshot_Mean", "%_Overshot_Median", "%_Overshot_Mode"],
+        var_name="Measures",
+    )
     plt.figure()
 
     measures_palette = ["#6c91ef", "#e4780c", "#8f00a3"]
@@ -296,7 +341,30 @@ def plot_percent_overshot_by_tte(
     return ax
 
 
-def plot_weibull_for_fleet(model, dataset, n_devices: int = 50, seed: int = 123, max_time: int = 500, title=None, *, verbose: bool = False):
+def plot_weibull_for_fleet(
+    model,
+    dataset: ProvidenceDataset,
+    n_devices: int = 50,
+    seed: int = 123,
+    max_time: int = 500,
+    title: str = None,
+    *,
+    verbose: bool = False,
+):
+    """Draw a single Weibull curve from (a uniform random sample) ``n_devices``, predicted by ``model`` on ``dataset``.
+
+    Args:
+        model (ProvidenceModule): Pytorch nn.Module that will predict on the ``dataset``
+        dataset (ProvidenceDataset): the dataset with devices to draw
+        n_devices (int, optional): the number of devices to visualize. Defaults to 50.
+        seed (int, optional): numerical seed for the random sampling of devices. Defaults to 123.
+        max_time (int, optional): time steps from ``[0, max_time]`` over which to draw ``Weibull`` curves.
+            Defaults to 500.
+        title (str, optional): Title to give the plot. Defaults to None.
+        verbose (bool, optional): Whether to log issue with individual values in the beta sequences predicted by
+            ``mode``. Defaults to False.
+    """
+
     def random_indexes(l, n):
         random.seed(seed)
 
@@ -326,11 +394,28 @@ def plot_weibull_for_fleet(model, dataset, n_devices: int = 50, seed: int = 123,
     beta = pt.Tensor([x[-1] for idx, x in enumerate(last_beta) if idx in indicies])
     tte = pt.Tensor([x for idx, x in enumerate(last_tte) if idx in indicies])
 
-    return plot_weibull(alpha=alpha, beta=beta, tte=tte, max_time=max_time, title=title, palette="muted", verbose=verbose)
+    return plot_weibull(
+        alpha=alpha,
+        beta=beta,
+        tte=tte,
+        max_time=max_time,
+        title=title,
+        palette="muted",
+        verbose=verbose,
+    )
+
 
 def incremental_scoring(feats, targets, model):
-    # NOTE: this function was used for EDA of the Weibull progression over the course training. Your mileage may vary.
+    """EXPERIMENTAL: Analyze sequence of Weibull-per-Weibull predictions made by ``model``.
 
+
+    NOTE: this function was used for EDA of the Weibull progression over the course training. Your mileage may vary.
+
+    Args:
+        feats (pt.Tensor): first element of the tuple given from a ``ProvidenceDataset``
+        targtes (pt.Tensor): second element of the tuple given from a ``ProvidenceDataset``
+        model (nn.Module): a module that can predict on Providence data.
+    """
     f_len = feats.shape[0]
 
     modes, alphas, betas = pt.zeros(f_len, 1), pt.zeros(f_len, 1), pt.zeros(f_len, 1)
@@ -348,17 +433,29 @@ def incremental_scoring(feats, targets, model):
     return modes, alphas, betas
 
 
-def plot_weibull_given_modes(alpha, beta, modes, ttes: pt.Tensor, max_time: int = 500, title: str = None, *,
-    show_vertical_pred = False, subplots_kwargs=None) -> None:
+def plot_weibull_given_modes(
+    alpha: pt.Tensor,
+    beta: pt.Tensor,
+    modes: pt.Tensor,
+    ttes: pt.Tensor,
+    max_time: int = 500,
+    title: str = None,
+    *,
+    show_vertical_pred=False,
+    subplots_kwargs=None,
+) -> Tuple[plt.Figure, Union[plt.Axes, List[plt.Axes], np.ndarray]]:
     """
     Plot Weibull distributions over time
 
-    :param alpha: Weibull alpha parameter
-    :param beta: Weibull beta parameter
-    :param tte: Tensor of time until event values
-    :param max_time: Maximim time value to plot
-
-    :return: None
+    Args:
+        alpha (pt.Tensor): Weibull alpha parameter
+        beta (pt.Tensor): Weibull beta parameter
+        tte (pt.Tensor): Tensor of time until event values
+        max_time (int): Maximim time value to plot
+        title (str, optional): title to the plot. Defaults to None.
+        show_vertical_pred (bool, optional): Whether to draw a vertical indicator to the peek of the Weibull curve.
+            Defaults to False.
+        subplots_kwargs (dict, optional): arguments to given to ``plt.subplots``. Defaults to dict.
     """
     plt, rotor_context, sns = check_for_mpl()
 
@@ -399,24 +496,23 @@ def plot_weibull_given_modes(alpha, beta, modes, ttes: pt.Tensor, max_time: int 
 def smpe_by_device(
     model: pt.nn.Module,
     distribution: Distribution,
-    fleet_object: FleetType,
+    fleet_object: Union[FleetType, Iterator[Tuple[str, Tuple[Any, ...]]]],
     *,
-    prediction_summary_stat = "mode"
+    prediction_summary_stat="mode",
 ) -> None:
     """
     Plot SMPE for each device, color-coding undershoot vs. overshoot
 
-    :param model: Providence-trained model
-    :param distribution: Module of providence.distributions
-    :param fleet_object: Providence test dataset
+    model (nn.Module): Providence-compatible model
+    distribution (Distribution): type of a ``SurvivalAnalysisDistribution`` e.g. ``Weibull``
+    fleet_object (FleetType): Providence dataset on which to analyze ``model``'s performance.
+    prediction_summary_stat (str, optional): stat in {mean, median, mode}. Defaults to "mode".
 
-    Keyword Arguments:
-    :param prediction_summary_stat: stat in {mean, median, mode}
-
-    :return: None
+    Returns:
+        plt.Axes: axis drawn on to visualize the SMPE per device plot.
     """
 
-    smpe_ = []
+    smpes_: List[pd.DataFrame] = []
 
     if isinstance(fleet_object, ProvidenceDataset):
         fleet_object = fleet_object.iter_tensors_with_id()
@@ -429,46 +525,51 @@ def smpe_by_device(
 
     model.eval()
     for device_id, (feature_tens, prov_targets_tens) in fleet_object:
-
         params = distribution.compute_distribution_parameters(model, feature_tens)
 
         # just a reference, the following line
         # device_df = generate_distribution_measures(distribution, ab, prov_target_tens)
         # is replaced by the shorter block below
-        device_df = pd.DataFrame({
-            "tte": prov_targets_tens.numpy()[:, 0],
-            prediction_summary_stat: tte_infer(params)
-        })
+        device_df = pd.DataFrame(
+            {
+                "tte": prov_targets_tens.numpy()[:, 0],
+                prediction_summary_stat: tte_infer(params),
+            }
+        )
 
         y_true, y_pred = device_df["tte"], device_df[prediction_summary_stat]
-        d = {'smpe': [smpe(y_true, y_pred)], 'seq_len': [len(device_df)]}
+        d = {"smpe": [smpe(y_true, y_pred)], "seq_len": [len(device_df)]}
         device_smpe = pd.DataFrame(data=d)
         device_smpe["id"] = device_id
 
-        smpe_.append(device_smpe)
+        smpes_.append(device_smpe)
 
-    smpe_ = pd.concat(smpe_)
-
-    smpe_["overshoot"] = np.where(smpe_['smpe'] < 0, 'Overshoot', 'Undershoot')
+    smpe_ = pd.concat(smpes_)
+    # NOTE: mypy cannot understand this pandas syntax.
+    smpe_["overshoot"] = np.where(smpe_["smpe"] < 0, "Overshoot", "Undershoot")  # type: ignore[call-overload]
 
     plt, rotor_context, sns = check_for_mpl()
 
     plt.figure()
 
     with rotor_context:
-        ax = sns.scatterplot(x=smpe_["seq_len"], y=smpe_["smpe"], hue=smpe_["overshoot"])
+        # NOTE: mypy cannot understand this pandas syntax.
+        ax = sns.scatterplot(x=smpe_["seq_len"], y=smpe_["smpe"], hue=smpe_["overshoot"])  # type: ignore[call-overload]
         ax.legend(loc="upper right")
-        ax.set_ylim(-1,1)
+        ax.set_ylim(-1, 1)
         ax.set_xlabel("Sequence Length")
         ax.set_ylabel("SMPE")
         ax.set_title("SMPE by Device", y=1)
 
     return ax
 
+
 from functools import lru_cache
+
+
 class Visualizer:
-    """
-    The core functions of the visualizations module, with intermediate calculations stripped out or cached to save time.
+    """Core functions to visualize modules, leveraging pre-computation from ``MetricsCalculator`` to save time.
+
     For one-off usage, the FleetType can be the iterator. If you supply an iterator, do NOT call warm_up_cache.
     For repeated usage, provide a ProvidenceDataset.
     """
@@ -481,31 +582,61 @@ class Visualizer:
         self.metrics_calculator = MetricsCalculator(self.model, self.dist, self.fleet)
 
     def warm_up_cache(self, *, min_timestep: int, max_timestep: int):
-        
+        """Invoke each of the caching computations, so visualizations run more quickly.
+
+        Args:
+            min_timestep (int): minimum timestep of desired window
+            max_timestep (int): maximum timestep of desired window
+        """
         funcs_to_cache = [
             self.metrics_calculator.error_by_timestep,
             self.metrics_calculator.metrics_by_timestep,
-            self.metrics_calculator.percent_overshot_by_tte,]
+            self.metrics_calculator.percent_overshot_by_tte,
+        ]
 
         for func_to_cache in funcs_to_cache:
             func_to_cache(min_timestep=min_timestep, max_timestep=max_timestep)
 
-    @lru_cache
+    @lru_cache  # noqa: B019
     def error_by_timestep(self, *, min_timestep: int, max_timestep: int):
+        """Calculate error between actual TTE and mean, median, and mode of output distribution for each timestep.
+
+        This is a direct pass-through to the ``MetricsCalculator``.
+        Please see ``MetricsCalculator.error_by_timestep`` for fuller documentation.
+        """
         res = self.metrics_calculator.error_by_timestep(min_timestep=min_timestep, max_timestep=max_timestep)
         return res
 
-    @lru_cache
+    @lru_cache  # noqa: B019
     def metrics_by_timestep(self, *, min_timestep: int, max_timestep: int):
+        """Calculate MSE and MFE for all devices at each timestep.
+
+        This is a direct pass-through to the ``MetricsCalculator``.
+        Please see ``MetricsCalculator.metrics_by_timestep`` for fuller documentation.
+        """
         res = self.metrics_calculator.metrics_by_timestep(min_timestep=min_timestep, max_timestep=max_timestep)
         return res
 
-    @lru_cache
+    @lru_cache  # noqa: B019
     def percent_overshot_by_tte(self, *, min_timestep: int, max_timestep: int):
+        """Calculate how many predictions have overshot the actual TTE at each timestep for mean, median, and mode.
+
+        This is a direct pass-through to the ``MetricsCalculator``.
+        Please see ``MetricsCalculator.percent_overshot_by_tte`` for fuller documentation.
+        """
         res = self.metrics_calculator.percent_overshot_by_tte(min_timestep=min_timestep, max_timestep=max_timestep)
         return res
 
     def plot_mfe_by_timestep(self, *, min_timestep: int, max_timestep: int):
+        """Plot MFE by timestep between (inclusive) ``min_timestep`` and ``max_timestep``.
+
+        Args:
+            min_timestep (int): minimum timestep of desired window
+            max_timestep (int): maximum timestep of desired window
+
+        Returns:
+            plt.Axes: axis drawn on to visualize the MFE over time
+        """
         plt, rotor_context, sns = check_for_mpl()
 
         metrics_by_ts = self.metrics_by_timestep(max_timestep=max_timestep, min_timestep=min_timestep)
@@ -522,8 +653,16 @@ class Visualizer:
 
         return ax
 
-    
     def plot_mse_by_timestep(self, *, min_timestep: int, max_timestep: int):
+        """Plot MSE by timestep between (inclusive) ``min_timestep`` and ``max_timestep``.
+
+        Args:
+            min_timestep (int): minimum timestep of desired window
+            max_timestep (int): maximum timestep of desired window
+
+        Returns:
+            plt.Axes: axis drawn on to visualize the MSE over time
+        """
         plt, rotor_context, sns = check_for_mpl()
 
         metrics_by_ts = self.metrics_by_timestep(min_timestep=min_timestep, max_timestep=max_timestep)
@@ -540,8 +679,21 @@ class Visualizer:
 
         return ax
 
-    
     def scatterplot_overshoot_mode(self, *, min_timestep: int, max_timestep: int):
+        """Scatterplot of mode predictions by timestep between (inclusive) ``min_timestep`` and ``max_timestep``.
+
+        This plot is particularly useful to show per-device mean of ``"mode"`` predictions, to see if the model is
+        getting predictions nearly correct as we approach the termination of sequence. This is even more useful if
+        drawn only against uncensored entities - those entities that experience events. When appled to censored entities
+        it begs the question of the intent of the analyst, but do so if you find utility.
+
+        Args:
+            min_timestep (int): minimum timestep of desired window
+            max_timestep (int): maximum timestep of desired window
+
+        Returns:
+            plt.Axes: axis drawn on to visualize the scattplot
+        """
         plt, rotor_context, sns = check_for_mpl()
 
         error_by_ts = self.error_by_timestep(min_timestep=min_timestep, max_timestep=max_timestep)
@@ -549,7 +701,11 @@ class Visualizer:
         plt.figure()
 
         with rotor_context:
-            ax = sns.scatterplot(x=error_by_ts["tte"], y=error_by_ts["error_mode"], hue=error_by_ts["mode_overshoot"])
+            ax = sns.scatterplot(
+                x=error_by_ts["tte"],
+                y=error_by_ts["error_mode"],
+                hue=error_by_ts["mode_overshoot"],
+            )
             ax.legend(loc="upper right", title="Overshoot")
             ax.set_xlabel("Actual TTE")
             ax.set_ylabel("Prediction Error (Mode of Distribution)")
@@ -557,12 +713,26 @@ class Visualizer:
             ax.set_title("Overshoot by Distribution Mode TTE", y=1)
 
         return ax
-    
+
     def plot_percent_overshot_by_tte(self, *, min_timestep: int, max_timestep: int):
+        """Plot percentage of predictions overshot, by timestep between (inclusive) ``min_timestep`` and ``max_timestep``.
+
+        Args:
+            min_timestep (int): minimum timestep of desired window
+            max_timestep (int): maximum timestep of desired window
+
+        Returns:
+            plt.Axes: axis drawn on to visualize the percentage of overshooting over time
+        """
         plt, rotor_context, sns = check_for_mpl()
 
         overshot = self.percent_overshot_by_tte(min_timestep=min_timestep, max_timestep=max_timestep)
-        df = pd.melt(overshot, id_vars=["TTE"], value_vars=["%_Overshot_Mean", "%_Overshot_Median", "%_Overshot_Mode"], var_name="Measures")
+        df = pd.melt(
+            overshot,
+            id_vars=["TTE"],
+            value_vars=["%_Overshot_Mean", "%_Overshot_Median", "%_Overshot_Mode"],
+            var_name="Measures",
+        )
         plt.figure()
 
         measures_palette = ["#6c91ef", "#e4780c", "#8f00a3"]

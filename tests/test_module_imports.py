@@ -1,7 +1,10 @@
+# flake8: noqa F401
 """
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
+
+
 def test_imports():
     import providence
     from providence import datasets, dataloaders, distributions, metrics, nn, loss
@@ -11,4 +14,11 @@ def test_imports():
     import providence.datasets.utils as utils
     from providence.datasets import adapters, backblaze, nasa, utils
     from providence.nn import adaptive, module, rnn, transformer, weibull
-    from providence import paper_reproductions, training, type_utils, types, utils, visualization
+    from providence import (
+        paper_reproductions,
+        training,
+        type_utils,
+        types,
+        utils,
+        visualization,
+    )

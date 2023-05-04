@@ -13,26 +13,21 @@
 # MAGIC 2. We scrap the project and scramble to make something else happen.
 # MAGIC
 # MAGIC Alternatives would likely be derivatives of these
-# MAGIC 
+# MAGIC
 # MAGIC
 # MAGIC **Raytheon Technologies proprietary**
 # MAGIC Export controlled - see license file
-
 # COMMAND ----------
-
 # MAGIC %pip install --force /dbfs/FileStore/binaries/providence-1.0.0rc7-py3-none-any.whl
-
 # COMMAND ----------
-
 # export http_proxy=http://devproxy.utc.com:80
-
 import os
 
 from experiments.databricks.axial_attention import transformer_training_epoch
 from providence_utils.trainer import Trainer
 
-os.environ["http_proxy"] = 'http://devproxy.utc.com:80'
-os.environ["https_proxy"] = 'http://devproxy.utc.com:80'
+os.environ["http_proxy"] = "http://devproxy.utc.com:80"
+os.environ["https_proxy"] = "http://devproxy.utc.com:80"
 
 # COMMAND ----------
 
@@ -46,22 +41,46 @@ import torch
 from torch import nn, optim
 
 from providence.datasets import (
-    BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER, BackblazeDatasets, BackblazeExtendedDatasets, NasaDatasets,
-    NasaFD00XDatasets, NasaTurbofanTest, ProvidenceDataset
+    BACKBLAZE_EXTENDED_QUARTERS_FOR_PAPER,
+    BackblazeDatasets,
+    BackblazeExtendedDatasets,
+    NasaDatasets,
+    NasaFD00XDatasets,
+    NasaTurbofanTest,
+    ProvidenceDataset,
 )
 from providence.datasets.adapters import BackblazeQuarter
-from providence.nn import ProvidenceGRU, ProvidenceLSTM, ProvidenceRNN, ProvidenceVanillaRNN
+from providence.nn import (
+    ProvidenceGRU,
+    ProvidenceLSTM,
+    ProvidenceRNN,
+    ProvidenceVanillaRNN,
+)
 from providence.nn.transformer import ProvidenceTransformer
 from providence.training import (
-    OptimizerWrapper, minimize_torch_runtime_overhead, set_torch_default_dtypes, training_pass, use_gpu_if_available,
-    validation_pass
+    OptimizerWrapper,
+    minimize_torch_runtime_overhead,
+    set_torch_default_dtypes,
+    training_pass,
+    use_gpu_if_available,
+    validation_pass,
 )
-from providence.utils import (configure_logger_in_dir, name_and_args, now_dt_string, remove_keys_from_dict, set_seed)
+from providence.utils import (
+    configure_logger_in_dir,
+    name_and_args,
+    now_dt_string,
+    remove_keys_from_dict,
+    set_seed,
+)
 from providence_utils.callbacks import (
-    CachedIntervalMetricsVisualizer, EarlyStopping, EmergencyBrake, LearningCurveTracker, ModelCheckpointer,
-    WriteModelOutputs
+    CachedIntervalMetricsVisualizer,
+    EarlyStopping,
+    EmergencyBrake,
+    LearningCurveTracker,
+    ModelCheckpointer,
+    WriteModelOutputs,
 )
-from providence_utils.hyperparameter_sweeper import (HyperparameterSweeper, Metrics)
+from providence_utils.hyperparameter_sweeper import HyperparameterSweeper, Metrics
 
 # COMMAND ----------
 
@@ -73,9 +92,9 @@ class TrainingDataset(str, enum.Enum):
     bbe = "BackblazeExtended"
 
 
-def construct_datasets(dataset_name: TrainingDataset,
-                       easy_mode: bool = False,
-                       **kwargs) -> Tuple[ProvidenceDataset, ProvidenceDataset]:
+def construct_datasets(
+    dataset_name: TrainingDataset, easy_mode: bool = False, **kwargs
+) -> Tuple[ProvidenceDataset, ProvidenceDataset]:
     def equals_ignorecase(s1: str, s2: str) -> bool:
         return s1.casefold() == s2.casefold()
 
@@ -139,7 +158,7 @@ def search_hyperparameter_space(
         - visualization_frequency: Frequency with which to draw metrics visualizations. Only takes effect is num_epochs >= 100.
                                     All visualizations are done after the last epoch
         - ebrake_epoch: Assign to a positive number if you want to terminate training early, programmatically
-        - ebrake_requisite_loss: If neither train- nor validation-loss descends below this level, training is terminated early. Only takes effect is ebrake-epoch > 0. 
+        - ebrake_requisite_loss: If neither train- nor validation-loss descends below this level, training is terminated early. Only takes effect is ebrake-epoch > 0.
     """
     logger = logging.getLogger(__name__)
     device = use_gpu_if_available()
@@ -155,8 +174,14 @@ def search_hyperparameter_space(
     pprint(sweep_conf_json)
 
     def transformer_init(
-        n_features, *, hidden_size: int, n_layers: int, n_attention_heads: int, dropout: float, layer_norm_eps: float,
-        **kwargs
+        n_features,
+        *,
+        hidden_size: int,
+        n_layers: int,
+        n_attention_heads: int,
+        dropout: float,
+        layer_norm_eps: float,
+        **kwargs,
     ) -> ProvidenceTransformer:
         return ProvidenceTransformer(
             n_features,
@@ -165,11 +190,15 @@ def search_hyperparameter_space(
             n_attention_heads=n_attention_heads,
             dropout=dropout,
             layer_norm_epsilon=layer_norm_eps,
-            positional_encoding_dimension=kwargs.get("positional_encoding", 500)
+            positional_encoding_dimension=kwargs.get("positional_encoding", 500),
         )
 
     def rnn_init(n_features, *, model_type: str, hidden_size: int, n_layers: int, dropout: float) -> ProvidenceRNN:
-        ctor = {"gru": ProvidenceGRU, "lstm": ProvidenceLSTM, "rnn": ProvidenceVanillaRNN}[model_type]
+        ctor = {
+            "gru": ProvidenceGRU,
+            "lstm": ProvidenceLSTM,
+            "rnn": ProvidenceVanillaRNN,
+        }[model_type]
         return ctor(
             n_features,
             hidden_size=hidden_size,
@@ -247,9 +276,16 @@ def search_hyperparameter_space(
         num_epochs = training_config["general"]["num_epochs"]
 
         model = model_init(num_features, **training_config["model"])
-        opt = optim.SGD(model.parameters(), lr=training_config["optimizer"]["lr"], nesterov=True, momentum=0.9)
+        opt = optim.SGD(
+            model.parameters(),
+            lr=training_config["optimizer"]["lr"],
+            nesterov=True,
+            momentum=0.9,
+        )
         optim_wrapper = OptimizerWrapper(
-            opt, batch_size=training_config["general"]["bs"], num_epochs=training_config["general"]["num_epochs"]
+            opt,
+            batch_size=training_config["general"]["bs"],
+            num_epochs=training_config["general"]["num_epochs"],
         )
 
         # we don't want to visualize too often, because it's an expensive operation.
@@ -260,9 +296,15 @@ def search_hyperparameter_space(
             LearningCurveTracker(every=2, output_dir=rundir),
             ModelCheckpointer(rundir, track=early_stopping_metric, logger=logger),
             CachedIntervalMetricsVisualizer(
-                every=metrics_viz_frequency, output_dir=rundir / "metrics_plots", logger=logger
+                every=metrics_viz_frequency,
+                output_dir=rundir / "metrics_plots",
+                logger=logger,
             ),
-            WriteModelOutputs(last_epoch_number=num_epochs, output_dir=rundir / "outputs", logger=logger),
+            WriteModelOutputs(
+                last_epoch_number=num_epochs,
+                output_dir=rundir / "outputs",
+                logger=logger,
+            ),
         ]
 
         if early_stopping > -1:
@@ -276,6 +318,7 @@ def search_hyperparameter_space(
         torch.save(model, rundir / "model.pt")
 
         return losses
+
     # end train_model()
     print()
 
@@ -288,27 +331,24 @@ def search_hyperparameter_space(
 # COMMAND ----------
 
 sweeps_json = {
-    "model":
-        {
-            "model_type": ["gru", "lstm"],
-            "hidden_size": [32, 64, 128, 256, 512],
-            "n_layers": [4],
-            "n_attention_heads": [4],
-            "dropout": [0.1, 0.9],
-            "layer_norm_eps": [1e-5, 1e-4, 3e-4, 1e-3]
-        },
-    "optimizer": {
-        "lr": [3e-2, 1e-2]
+    "model": {
+        "model_type": ["gru", "lstm"],
+        "hidden_size": [32, 64, 128, 256, 512],
+        "n_layers": [4],
+        "n_attention_heads": [4],
+        "dropout": [0.1, 0.9],
+        "layer_norm_eps": [1e-5, 1e-4, 3e-4, 1e-3],
     },
+    "optimizer": {"lr": [3e-2, 1e-2]},
     "general": {
         "num_epochs": [100],
         "bs": [64, 128],
-        "seed": ["random", 14682599077633313808, 1123705791327780546]
-    }
+        "seed": ["random", 14682599077633313808, 1123705791327780546],
+    },
 }
 
 # COMMAND ----------
 
-output_path = '/dbfs/Filestore/providence-legacy/'
+output_path = "/dbfs/Filestore/providence-legacy/"
 
 super_sweeps_result = search_hyperparameter_space(sweeps_json, output_root=output_path)

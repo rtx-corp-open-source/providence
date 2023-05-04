@@ -23,27 +23,41 @@ from typing import Union
 
 import torch
 import typer
-from pandas import DataFrame
 from pandas import concat as concat_dataframes
+from pandas import DataFrame
 
-from providence.datasets.adapters import BackblazeQuarter, load_backblaze_csv
-from providence.dataloaders import BasicDataloaders, CustomProvidenceDataloaders
-from providence.datasets import (
-    BackblazeDataset, BackblazeDatasets_from_split, BackblazePreprocessing, DataSubsetId, NasaDataset,
-    censor_backblaze_splits, df_train_test_split, downsample_to_event_portion
-)
-from providence.training import (minimize_torch_runtime_overhead, use_gpu_if_available)
-from providence.utils import (cached_dataframe, name_and_args, now_dt_string, save_df)
 from providence import paper_reproductions
+from providence.dataloaders import BasicDataloaders
+from providence.dataloaders import CustomProvidenceDataloaders
+from providence.datasets import BackblazeDataset
+from providence.datasets import BackblazeDatasets_from_split
+from providence.datasets import BackblazePreprocessing
+from providence.datasets import censor_backblaze_splits
+from providence.datasets import DataSubsetId
+from providence.datasets import df_train_test_split
+from providence.datasets import downsample_to_event_portion
+from providence.datasets import NasaDataset
+from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets.adapters import load_backblaze_csv
+from providence.training import minimize_torch_runtime_overhead
+from providence.training import use_gpu_if_available
+from providence.utils import cached_dataframe
+from providence.utils import name_and_args
+from providence.utils import now_dt_string
+from providence.utils import save_df
 
 logger = getLogger(__name__)
 
 
 def censoring_experiment_round(
-    df_all: DataFrame, censoring_proportion: Union[float, int], *, seed: int = 1234, n_laps: int = 3
+    df_all: DataFrame,
+    censoring_proportion: Union[float, int],
+    *,
+    seed: int = 1234,
+    n_laps: int = 3,
 ) -> DataFrame:
     """
-    This is somewhere between a mid-level and low-level experiment, chiefly from all the interaction with
+    Run something between a mid-level and low-level experiment, chiefly from all the interaction with
     the Dataset (which is the point of this experiment).
     """
     df_split = df_train_test_split(df_all, "serial_number", split_percentage=0.8, seed=seed)
@@ -98,43 +112,56 @@ def run_data_censoring_experiment(random_seed: int = 1234, n_laps: int = 3):
     # That's knocking on 3 minutes just to do the thing that I'm actually interested in
     df_all = cached_dataframe(
         lambda: (
-            load_backblaze_csv(BackblazeQuarter._2019_Q4, data_root='./.data').groupby("serial_number").
-            filter(lambda df: df.isna().sum().sum() == 0)
-        ), f"./.data/backblaze-download/{BackblazeQuarter._2019_Q4.value}/filtered.csv"
+            load_backblaze_csv(BackblazeQuarter._2019_Q4, data_root="./.data")
+            .groupby("serial_number")
+            .filter(lambda df: df.isna().sum().sum() == 0)
+        ),
+        f"./.data/backblaze-download/{BackblazeQuarter._2019_Q4.value}/filtered.csv",
     )
     duration = perf_counter() - start_time
     logger.info(f"Filtering out nans took {duration} seconds")
 
     experiment_metrics = []
-    ## DOE(censoring_proportion): the main knob that we're going to turn
-    for censoring_proportion in [0, .5, 1, 2, 3]:
+    # - DOE(censoring_proportion): the main knob that we're going to turn
+    for censoring_proportion in [0, 0.5, 1, 2, 3]:
         logger.info(f"censoring proportion (censored:uncensored) = {censoring_proportion}:1")
         metrics = censoring_experiment_round(df_all, censoring_proportion, seed=random_seed, n_laps=n_laps)
         metrics["censoring_proportion"] = censoring_proportion
         experiment_metrics.append(metrics)
 
     metrics_all = concat_dataframes(experiment_metrics)
-    save_df(metrics_all, f"censoring_experiment-{experiment_start_timestamp}.csv", root='./outputs')
+    save_df(
+        metrics_all,
+        f"censoring_experiment-{experiment_start_timestamp}.csv",
+        root="./outputs",
+    )
 
 
 def get_model_and_optimizer_initializer(dataset_name: str):
-    if dataset_name == 'backblaze':
-        return paper_reproductions.BackblazeTransformer, paper_reproductions.BackblazeTransformerOptimizer
-    elif dataset_name == 'nasa' or dataset_name == 'nasa-old':
-        return paper_reproductions.NasaTransformer, paper_reproductions.NasaTransformerOptimizer
+    if dataset_name == "backblaze":
+        return (
+            paper_reproductions.BackblazeTransformer,
+            paper_reproductions.BackblazeTransformerOptimizer,
+        )
+    elif dataset_name == "nasa" or dataset_name == "nasa-old":
+        return (
+            paper_reproductions.NasaTransformer,
+            paper_reproductions.NasaTransformerOptimizer,
+        )
     else:
         raise ValueError(f"Unsupported dataset: '{dataset_name}'")
 
 
 def get_dataset_initializers(dataset_name: str, *, random_seed: int = 1234):
-    if dataset_name == 'backblaze':
+    if dataset_name == "backblaze":
 
         def train_init():
-            return BackblazeDataset(DataSubsetId.Train, random_seed=random_seed, normalization_by='device')
+            return BackblazeDataset(DataSubsetId.Train, random_seed=random_seed, normalization_by="device")
 
         def test_init():
-            return BackblazeDataset(DataSubsetId.Test, normalization_by='fleet', random_seed=random_seed)
-    elif dataset_name == 'nasa':
+            return BackblazeDataset(DataSubsetId.Test, normalization_by="fleet", random_seed=random_seed)
+
+    elif dataset_name == "nasa":
 
         def train_init():
             return NasaDataset(DataSubsetId.Train)
@@ -148,9 +175,9 @@ def get_dataset_initializers(dataset_name: str, *, random_seed: int = 1234):
     return train_init, test_init
 
 
-def run_data_failure_portion_experiment(random_seed: int = 1234, n_laps: int = 3, dataset_name: str = 'backblaze'):
-    "This experiment is reduces the number of failure events available in the training set and reports the impact on performance"
-    assert dataset_name in {'backblaze', 'nasa'}, "Should use a vaild dataset name"
+def run_data_failure_portion_experiment(random_seed: int = 1234, n_laps: int = 3, dataset_name: str = "backblaze"):
+    """Run an experiment that reduces the number of failure events available in the training set and reports the impact on performance"""
+    assert dataset_name in {"backblaze", "nasa"}, "Should use a vaild dataset name"
     logger.info("Starting failure portioning experiment")
 
     experiment_start_timestamp = now_dt_string()
@@ -206,7 +233,7 @@ def run_data_failure_portion_experiment(random_seed: int = 1234, n_laps: int = 3
     save_df(
         experiment_metrics,
         f"failure_portioning_experiment-{experiment_start_timestamp}-{dataset_name}.csv",
-        root="./outputs"
+        root="./outputs",
     )
 
 
@@ -217,16 +244,21 @@ class ExperimentToRun(Enum):
 
 def main(
     minimize_overhead: bool = typer.Option(
-        True, help="Disables all extraneous checks that PyTorch enables to ease debugging. 🔎"
+        True,
+        help="Disables all extraneous checks that PyTorch enables to ease debugging. 🔎",
     ),
     laps: int = typer.Option(
-        3, min=1, max=10, help="Number of times to re-run a model through epochs. For collecting statistics"
+        3,
+        min=1,
+        max=10,
+        help="Number of times to re-run a model through epochs. For collecting statistics",
     ),
     random_seed: int = typer.Option(1234, min=0, help="Integral-valued random seed for the experiment run"),
     experiment_prefix: ExperimentToRun = typer.Option(
-        ExperimentToRun.censoring.value, help="The experiment that you would like to run"
+        ExperimentToRun.censoring.value,
+        help="The experiment that you would like to run",
     ),
-    dataset_name: str = typer.Option(None, help="Only used for failure-experiment")
+    dataset_name: str = typer.Option(None, help="Only used for failure-experiment"),
 ):
     logger.info(f"Training args: {name_and_args()}")  # reproducibility
     logger.info(f"Init seed: {torch.initial_seed()}")

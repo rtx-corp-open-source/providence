@@ -7,35 +7,48 @@ Export controlled - see license file
 from collections import defaultdict
 from pathlib import Path
 from types import FunctionType
-from typing import List, Tuple, Union
+from typing import List
+from typing import Tuple
+from typing import Union
 
 import mlflow
+from jaxtyping import Int
 import torch as pt
-from providence.dataloaders import CustomProvidenceDataloaders, ProvidenceDataLoader
-from providence.datasets.adapters import DS_NAME_TO_FEATURE_COUNT
+
+from providence.dataloaders import CustomProvidenceDataloaders
+from providence.dataloaders import ProvidenceDataLoader
 from providence.datasets import NasaDatasets
-from providence.distributions import SurvivalAnalysisDistribution, Weibull
-from providence.loss import DiscreteWeibullLoss, DiscreteWeibullMSELoss, ProvidenceLoss, discrete_weibull_loss_fn
-from providence.nn import ProvidenceGRU, ProvidenceModule, ProvidenceTransformer
+from providence.datasets.adapters import DS_NAME_TO_FEATURE_COUNT
+from providence.distributions import SurvivalAnalysisDistribution
+from providence.distributions import Weibull
+from providence.loss import discrete_weibull_loss_fn
+from providence.loss import DiscreteWeibullLoss
+from providence.loss import DiscreteWeibullMSELoss
+from providence.loss import ProvidenceLoss
+from providence.nn import ProvidenceGRU
+from providence.nn import ProvidenceModule
+from providence.nn import ProvidenceTransformer
 from providence.paper_reproductions import GeneralMetrics
-from providence.training import OptimizerWrapper, set_torch_default_dtypes, use_gpu_if_available, training_epoch
-from providence.utils import now_dt_string, set_seed
-from providence_utils.callbacks import CachedIntervalMetricsVisualizer
-from providence_utils.hyperparameter_sweeper import nest_keys, HyperparameterSweeper, nest_values
-from providence_utils.merge_dict import merge_dictionaries
+from providence.training import OptimizerWrapper
+from providence.training import set_torch_default_dtypes
+from providence.training import training_epoch
+from providence.training import use_gpu_if_available
 from providence.type_utils import patch
-
-from torchtyping import TensorType
-
+from providence.utils import now_dt_string
+from providence.utils import set_seed
+from providence_utils.callbacks import CachedIntervalMetricsVisualizer
+from providence_utils.hyperparameter_sweeper import HyperparameterSweeper
+from providence_utils.hyperparameter_sweeper import nest_keys
+from providence_utils.hyperparameter_sweeper import nest_values
+from providence_utils.merge_dict import merge_dictionaries
+from providence_utils.mlflow import create_or_set_experiment
+from providence_utils.mlflow import try_log_artifacts
 
 ################################################################################
 #
 # MLFLow Setup
 #
 ################################################################################
-
-from providence_utils.mlflow import create_or_set_experiment, try_log_artifacts
-from providence.training import training_epoch
 
 
 def mlflow_epoch(dls, model, optimizer, *, step: int = None, loss_criterion):
@@ -74,7 +87,9 @@ dm._DEBUG = False
 
 metadata_to_log["data"]["global_seed_at_init"] = pt.initial_seed()
 
-GLOBAL_train_ds, GLOBAL_val_ds = NasaDatasets(data_root="/dbfs/FileStore/datasets/providence", )
+GLOBAL_train_ds, GLOBAL_val_ds = NasaDatasets(
+    data_root="/dbfs/FileStore/datasets/providence",
+)
 GLOBAL_test_ds = GLOBAL_val_ds
 metadata_to_log["data"]["name"] = "NASA"
 
@@ -94,21 +109,20 @@ from providence.training import LossAggregates
 # trainer = Trainer(mlflow_epoch)
 
 RUN_CONFIG = {
-    "model":
-        {
-            "n_heads": 2,
-            "n_layers": 1,
-            "n_features": DS_NAME_TO_FEATURE_COUNT["nasa"],
-            "n_embedding": 256,  # down from 128
-            "max_seq_len": 700,
-            "dropout": 0.1,
-        },
+    "model": {
+        "n_heads": 2,
+        "n_layers": 1,
+        "n_features": DS_NAME_TO_FEATURE_COUNT["nasa"],
+        "n_embedding": 256,  # down from 128
+        "max_seq_len": 700,
+        "dropout": 0.1,
+    },
     "optimizer": {
         "learning_rate": 1e-4,
         "batch_size": 22,  # down from 128
         "num_epochs": 80,
     },
-    "dataset": "nasa"
+    "dataset": "nasa",
 }
 
 # NOTE: just two function to keep things straight fortard
@@ -123,7 +137,7 @@ def make_transformer_model() -> ProvidenceModule:
         n_attention_heads=RUN_CONFIG["model"]["n_heads"],
         dropout=RUN_CONFIG["model"]["dropout"],
         positional_encoding_dimension=710,
-        device=use_gpu_if_available()
+        device=use_gpu_if_available(),
     )
     return model
 
@@ -135,7 +149,7 @@ def make_rnn_model() -> ProvidenceModule:
         RUN_CONFIG["model"]["n_embedding"],
         RUN_CONFIG["model"]["n_layers"],
         dropout=RUN_CONFIG["model"]["dropout"],
-        device=use_gpu_if_available()
+        device=use_gpu_if_available(),
     )
 
 
@@ -151,10 +165,12 @@ def __getitem__(self: Weibull.Params, indices) -> Weibull.Params:
 
 class DiscreteWeibullNanMeanNllFusion(ProvidenceLoss):
     def forward(
-        self, params: SurvivalAnalysisDistribution.Params, y: TensorType["time"],
-        _censor: TensorType["time"], _x_lengths: Union[List[int], TensorType["time"]]
+        self,
+        params: SurvivalAnalysisDistribution.Params,
+        y: Int[pt.Tensor, "time"],
+        _censor: Int[pt.Tensor, "time"],
+        _x_lengths: Union[List[int], Int[pt.Tensor, "time"]],
     ) -> Union[float, Tuple[float, ...]]:
-
         means = Weibull.mean(params)
         weibull_loss = discrete_weibull_loss_fn(params, y, _censor, _x_lengths)
         # medians = Weibull.median(params)
@@ -170,8 +186,10 @@ class DiscreteWeibullNanMeanNllFusion(ProvidenceLoss):
 
         return nmean + weibull_loss
 
+
 def post_run_metrics_evaluation(run_config, model, dls_to_use, output_dir, loss_agg):
     import logging
+
     print("Generating metrics", now_dt_string())
     dls_to_use.test_ds.device = model.device
     dls_to_use.test_ds.use_device_for_iteration(True)
@@ -179,24 +197,28 @@ def post_run_metrics_evaluation(run_config, model, dls_to_use, output_dir, loss_
 
     metric_visualizer = CachedIntervalMetricsVisualizer(1, output_dir, logging.getLogger())
     metric_visualizer.callable.func(run_config["optimizer"]["num_epochs"], model, None, None, dls_to_use)
-    
+
     print("Generating metrics completed", now_dt_string())
 
     merged_config = dict(**run_config, **metadata_to_log)
-    nested_config = {k: (type_or_func_name(v) if isinstance(v, (type, FunctionType)) else v) for (k, v) in nest_keys(merged_config).items()}
+    nested_config = {
+        k: (type_or_func_name(v) if isinstance(v, (type, FunctionType)) else v)
+        for (k, v) in nest_keys(merged_config).items()
+    }
     # nested_config["model.type"] = type_name(model)
 
-    mlflow.log_params(nested_config) # NOTE: this should **not** live here, but I messed up the code flow and it's not worth fixing for the findings.
+    mlflow.log_params(
+        nested_config
+    )  # NOTE: this should **not** live here, but I messed up the code flow and it's not worth fixing for the findings.
 
     mlflow.log_metrics(model_metrics.iloc[0].to_dict())
     try_log_artifacts(output_dir)
 
 
-def dumb_run(dls_to_use, run_config, make_model, new_loss = None):
-
+def dumb_run(dls_to_use, run_config, make_model, new_loss=None):
     if new_loss is None:
         new_loss = DiscreteWeibullMSELoss()
-    
+
     config = nest_keys(run_config)
     set_seed(pt.seed())
     # model = dm.ProvidenceBertTransformer(2, 1, DS_NAME_TO_FEATURE_COUNT["nasa"], 128, max_seq_len=710, device=use_gpu_if_available())
@@ -208,7 +230,7 @@ def dumb_run(dls_to_use, run_config, make_model, new_loss = None):
             lr=config["optimizer.learning_rate"],
         ),
         batch_size=config["optimizer.batch_size"],
-        num_epochs=config["optimizer.num_epochs"]
+        num_epochs=config["optimizer.num_epochs"],
     )
 
     # training-eval loop
@@ -241,33 +263,43 @@ def sweeping_assessment():
     fix_mlflow_backcatalog()
 
     with mlflow.start_run(experiment_id=create_or_set_experiment(EXPERIMENT_NAME.format("MSE Check"))):
-
-        for updates in HyperparameterSweeper.from_dict({
+        for updates in HyperparameterSweeper.from_dict(
+            {
                 "optimizer.num_epochs": [10, 20, 40, 80],
-                "optimizer.learning_rate": [3e-6, 3e-4, 3e-3, 1e-3,],
+                "optimizer.learning_rate": [
+                    3e-6,
+                    3e-4,
+                    3e-3,
+                    1e-3,
+                ],
                 "optimizer.batch_size": [4, 6, 8, 10, 12, 14, 16],
-        }).poll_sweeps():
+            }
+        ).poll_sweeps():
             run_config = smart_dict_upsert(run_config, updates)
-            for make_model in [
-                make_transformer_model,
-                make_rnn_model
-            ]:
+            for make_model in [make_transformer_model, make_rnn_model]:
                 with mlflow.start_run(nested=True):
                     dls_to_use = global_dls(run_config["optimizer"]["batch_size"])
                     output_dir = ROOT_DIR / now_dt_string()
-                    model, loss_agg = dumb_run(dls_to_use, run_config, make_model, new_loss=DiscreteWeibullMSELoss())
+                    model, loss_agg = dumb_run(
+                        dls_to_use,
+                        run_config,
+                        make_model,
+                        new_loss=DiscreteWeibullMSELoss(),
+                    )
                     post_run_metrics_evaluation(run_config, model, dls_to_use, output_dir, loss_agg)
 
 
-def single_run(new_exp_name = "MSE Check"):
+def single_run(new_exp_name="MSE Check"):
     fix_mlflow_backcatalog()
 
     with mlflow.start_run(experiment_id=create_or_set_experiment(EXPERIMENT_NAME.format(new_exp_name))):
-        for updates in HyperparameterSweeper.from_dict({
-            "optimizer.num_epochs": [40, 80],
-            "optimizer.learning_rate": [1e-6, 3e-6, 3e-4, 1e-3],
-            "optimizer.batch_size": [2, 4, 16, 128],
-        }).poll_sweeps():
+        for updates in HyperparameterSweeper.from_dict(
+            {
+                "optimizer.num_epochs": [40, 80],
+                "optimizer.learning_rate": [1e-6, 3e-6, 3e-4, 1e-3],
+                "optimizer.batch_size": [2, 4, 16, 128],
+            }
+        ).poll_sweeps():
             run_config = smart_dict_upsert(RUN_CONFIG, updates)
 
             for make_model in [
@@ -287,20 +319,29 @@ def type_or_func_name(f):
     return type(f).__name__
 
 
-def single_run_comparing_loss_functions(new_exp_name = "MSE Check - comparing losses"):
+def single_run_comparing_loss_functions(new_exp_name="MSE Check - comparing losses"):
     """Compare the three losses that we've generated against possible valid parameters that should work."""
     fix_mlflow_backcatalog()
 
-    for loss_func in [DiscreteWeibullLoss(), DiscreteWeibullMSELoss(), DiscreteWeibullNanMeanNllFusion()]:
-        with mlflow.start_run(experiment_id=create_or_set_experiment(EXPERIMENT_NAME.format(new_exp_name)), run_name=type_or_func_name(loss_func)):
-            for updates in HyperparameterSweeper.from_dict({
-                "optimizer.num_epochs": [80],
-                "optimizer.batch_size": [2, 4, 16, 128],
-                "optimizer.learning_rate": [3e-6, 3e-4, 1e-3],
-            }).poll_sweeps():
+    for loss_func in [
+        DiscreteWeibullLoss(),
+        DiscreteWeibullMSELoss(),
+        DiscreteWeibullNanMeanNllFusion(),
+    ]:
+        with mlflow.start_run(
+            experiment_id=create_or_set_experiment(EXPERIMENT_NAME.format(new_exp_name)),
+            run_name=type_or_func_name(loss_func),
+        ):
+            for updates in HyperparameterSweeper.from_dict(
+                {
+                    "optimizer.num_epochs": [80],
+                    "optimizer.batch_size": [2, 4, 16, 128],
+                    "optimizer.learning_rate": [3e-6, 3e-4, 1e-3],
+                }
+            ).poll_sweeps():
                 run_config = smart_dict_upsert(RUN_CONFIG, updates)
 
-                set_seed(metadata_to_log["data"]["global_seed_at_init"]) # NOTE: SETTING SEEDS IS IMPORTANT!
+                set_seed(metadata_to_log["data"]["global_seed_at_init"])  # NOTE: SETTING SEEDS IS IMPORTANT!
 
                 for make_model in [
                     make_transformer_model,
@@ -311,7 +352,6 @@ def single_run_comparing_loss_functions(new_exp_name = "MSE Check - comparing lo
                         output_dir = ROOT_DIR / now_dt_string()
                         model, loss_agg = dumb_run(dls_to_use, run_config, make_model, new_loss=loss_func)
                         post_run_metrics_evaluation(run_config, model, dls_to_use, output_dir, loss_agg)
-
 
 
 ################################################################################

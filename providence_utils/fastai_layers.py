@@ -6,60 +6,83 @@ Kept for educational purposes.
 Export controlled - see license file
 """
 import torch as pt
-from torch import Tensor, nn
+from torch import nn
+from torch import Tensor
 from torch.nn import functional as F
 
 from providence_utils.fastai_torch_core import Module
-from providence_utils.fastai_utils import is_listy, module
+from providence_utils.fastai_utils import is_listy
+from providence_utils.fastai_utils import module
 
 
 def init_lin_zero(m):
     if isinstance(m, (nn.Linear)):
-        if getattr(m, 'bias', None) is not None: nn.init.constant_(m.bias, 0)
+        if getattr(m, "bias", None) is not None:
+            nn.init.constant_(m.bias, 0)
         nn.init.constant_(m.weight, 0)
-    for l in m.children(): init_lin_zero(l)
+    for l in m.children():
+        init_lin_zero(l)
 
-lin_zero_init = init_lin_zero
 
-class MaxPPVPool1d(Module):
-    "Drop-in replacement for AdaptiveConcatPool1d - multiplies nf by 2"
-    def forward(self, x):
-        _max = x.max(dim=-1).values
-        _ppv = pt.gt(x, 0).sum(dim=-1).float() / x.shape[-1]
-        return pt.cat((_max, _ppv), dim=-1).unsqueeze(2)
+# NOTE(stephen): the following two layers are kept for when we use 1d Conv nets in Providence training.
+
 
 class AdaptiveConcatPool1d(Module):
-    "Layer that concats `AdaptiveAvgPool1d` and `AdaptiveMaxPool1d`"
+    "Layer that concats ``AdaptiveAvgPool1d`` and ``AdaptiveMaxPool1d``"
+
     def __init__(self, size=None):
         self.size = size or 1
         self.ap = nn.AdaptiveAvgPool1d(self.size)
         self.mp = nn.AdaptiveMaxPool1d(self.size)
-    def forward(self, x): return pt.cat([self.mp(x), self.ap(x)], 1)
+
+    def forward(self, x):
+        return pt.cat([self.mp(x), self.ap(x)], 1)
 
 
 class AdaptiveWeightedAvgPool1d(Module):
-    '''Global Pooling layer that performs a weighted average along the temporal axis
+    """Global Pooling layer that performs a weighted average along the temporal axis.
 
     It can be considered as a channel-wise form of local temporal attention. Inspired by the paper:
-    Hyun, J., Seong, H., & Kim, E. (2019). Universal Pooling--A New Pooling Method for Convolutional Neural Networks. arXiv preprint arXiv:1907.11440.'''
+    Hyun, J., Seong, H., & Kim, E. (2019). Universal Pooling--A New Pooling Method for Convolutional Neural Networks. arXiv preprint arXiv:1907.11440.
+    """
 
-    def __init__(self, n_in, seq_len, mult=2, n_layers=2, ln=False, dropout=0.5, act=nn.ReLU(), zero_init=True):
+    def __init__(
+        self,
+        n_in,
+        seq_len,
+        mult=2,
+        n_layers=2,
+        ln=False,
+        dropout=0.5,
+        act=nn.ReLU(),
+        zero_init=True,
+    ):
         layers = nn.ModuleList()
         for i in range(n_layers):
             inp_mult = mult if i > 0 else 1
-            out_mult = mult if i < n_layers -1 else 1
+            out_mult = mult if i < n_layers - 1 else 1
             p = dropout[i] if is_listy(dropout) else dropout
-            layers.append(LinLnDrop(seq_len * inp_mult, seq_len * out_mult, ln=False, p=p,
-                                    act=act if i < n_layers-1 and n_layers > 1 else None))
+            layers.append(
+                LinLnDrop(
+                    seq_len * inp_mult,
+                    seq_len * out_mult,
+                    ln=False,
+                    p=p,
+                    act=act if i < n_layers - 1 and n_layers > 1 else None,
+                )
+            )
         self.layers = layers
         self.softmax = SoftMax(-1)
-        if zero_init: init_lin_zero(self)
+        if zero_init:
+            init_lin_zero(self)
 
     def forward(self, x):
         wap = x
-        for l in self.layers: wap = l(wap)
+        for l in self.layers:
+            wap = l(wap)
         wap = self.softmax(wap)
         return pt.mul(x, wap).sum(-1)
+
 
 # https://docs.fast.ai/torch_core.html#tensorbase
 # class TensorBase(Tensor):
@@ -106,7 +129,7 @@ class AdaptiveWeightedAvgPool1d(Module):
 #         cls = type(self)
 #         res = self.as_subclass(Tensor).new() if x is None else self.as_subclass(Tensor).new(x)
 #         return res.as_subclass(cls)
-    
+
 #     def requires_grad_(self, requires_grad=True):
 #         # Workaround https://github.com/pytorch/pytorch/issues/50219
 #         self.requires_grad = requires_grad
@@ -115,58 +138,58 @@ class AdaptiveWeightedAvgPool1d(Module):
 
 @module(full=False)
 def Flatten(self, x: Tensor):
-    "Flatten `x` to a single dimension, e.g. at end of a model. `full` for rank-1 tensor"
+    "Flatten ``x`` to a single dimension, e.g. at end of a model. ``full`` for rank-1 tensor"
     # NOTE it's a little weird that Tensor{Base} was used, when a view will suffice and *is* correct.
-    return (x.view(-1) if self.full else x.view(x.size(0), -1))
-
+    return x.view(-1) if self.full else x.view(x.size(0), -1)
 
 
 class GAP1d(Module):
     "Global Adaptive Pooling + Flatten"
+
     def __init__(self, output_size=1):
         self.gap = nn.AdaptiveAvgPool1d(output_size)
         self.flatten = Flatten()
+
     def forward(self, x):
         return self.flatten(self.gap(x))
 
+
 class GACP1d(Module):
     "Global AdaptiveConcatPool + Flatten"
+
     def __init__(self, output_size=1):
         self.gacp = AdaptiveConcatPool1d(output_size)
         self.flatten = Flatten()
-    def forward(self, x):
-        return self.flatten(self.gacp(x))
 
-
-class GAWP1d(Module):
-    "Global AdaptiveWeightedAvgPool1d + Flatten"
-    def __init__(self, n_in, seq_len, n_layers=2, ln=False, dropout=0.5, act=nn.ReLU(), zero_init=False):
-        self.gacp = AdaptiveWeightedAvgPool1d(n_in, seq_len, n_layers=n_layers, ln=ln, dropout=dropout, act=act, zero_init=zero_init)
-        self.flatten = Flatten()
     def forward(self, x):
         return self.flatten(self.gacp(x))
 
 
 class LinLnDrop(nn.Sequential):
-    "Module grouping `LayerNorm1d`, `Dropout` and `Linear` layers"
-    def __init__(self, n_in, n_out, ln=True, p=0., act=None, lin_first=False):
+    "Module grouping ``LayerNorm1d``, ``Dropout`` and ``Linear`` layers"
+
+    def __init__(self, n_in, n_out, ln=True, p=0.0, act=None, lin_first=False):
         layers = [nn.LayerNorm(n_out if lin_first else n_in)] if ln else []
-        if p != 0: layers.append(nn.Dropout(p))
+        if p != 0:
+            layers.append(nn.Dropout(p))
         lin = [nn.Linear(n_in, n_out, bias=not ln)]
-        if act is not None: lin.append(act)
-        layers = lin+layers if lin_first else layers+lin
+        if act is not None:
+            lin.append(act)
+        layers = lin + layers if lin_first else layers + lin
         super().__init__(*layers)
 
 
 class Pad1d(nn.ConstantPad1d):
-    def __init__(self, padding, value=0.):
+    def __init__(self, padding, value=0.0):
         super().__init__(padding, value)
+
 
 def sigmoid_range(x, low, high):
     "Sigmoid function with range `(low, high)`"
     return pt.sigmoid(x) * (high - low) + low
 
-@module('low','high')
+
+@module("low", "high")
 def SigmoidRange(self, x):
     "Sigmoid module with range `(low, high)`"
     return sigmoid_range(x, self.low, self.high)
@@ -174,19 +197,29 @@ def SigmoidRange(self, x):
 
 class SoftMax(Module):
     "SoftMax layer"
+
     def __init__(self, dim=-1):
         self.dim = dim
+
     def forward(self, x):
         return F.softmax(x, dim=self.dim)
-    def __repr__(self): return f'{self.__class__.__name__}(dim={self.dim})'
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(dim={self.dim})"
 
 
 class Transpose(Module):
-    def __init__(self, *dims, contiguous=False): self.dims, self.contiguous = dims, contiguous
-    def forward(self, x):
-        if self.contiguous: return x.transpose(*self.dims).contiguous()
-        else: return x.transpose(*self.dims)
-    def __repr__(self):
-        if self.contiguous: return f"{self.__class__.__name__}(dims={', '.join([str(d) for d in self.dims])}).contiguous()"
-        else: return f"{self.__class__.__name__}({', '.join([str(d) for d in self.dims])})"
+    def __init__(self, *dims, contiguous=False):
+        self.dims, self.contiguous = dims, contiguous
 
+    def forward(self, x):
+        if self.contiguous:
+            return x.transpose(*self.dims).contiguous()
+        else:
+            return x.transpose(*self.dims)
+
+    def __repr__(self):
+        if self.contiguous:
+            return f"{self.__class__.__name__}(dims={', '.join([str(d) for d in self.dims])}).contiguous()"
+        else:
+            return f"{self.__class__.__name__}({', '.join([str(d) for d in self.dims])})"

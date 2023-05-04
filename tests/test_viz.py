@@ -3,9 +3,9 @@
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from providence import visualization as viz
 
@@ -15,7 +15,10 @@ SIZE = 100
 @pytest.fixture(scope="module")
 def prediction_df():
     dummy_df = pd.DataFrame.from_dict(
-        {"prediction": np.arange(100) + np.random.randint(0, 15, 100), "tte": np.arange(100) + np.random.randint(0, 15, 100),}
+        {
+            "prediction": np.arange(100) + np.random.randint(0, 15, 100),
+            "tte": np.arange(100) + np.random.randint(0, 15, 100),
+        }
     )
     return dummy_df
 
@@ -59,7 +62,9 @@ class TestImportTools:
 
     def test_the_import_test(self):
         # practice environment hygiene
-        assert self.local_has_dependency("vega") == False, "Shouldn't be able to import vega. Not a providence dep so this shoul be False"
+        assert (
+            self.local_has_dependency("vega") == False
+        ), "Shouldn't be able to import vega. Not a providence dep so this shoul be False"
 
         # dependency of the project
         assert self.local_has_dependency("matplotlib.pyplot") == True, "Should have matplotlib on local"
@@ -81,5 +86,6 @@ class TestImportTools:
 
     def test_all_dependencies_exist(self):
         deps = viz.check_for_mpl()
-        assert all(map(lambda x: x is not None, deps)), "Everything should be loaded successfully, without surprise Nones"
-
+        assert all(
+            map(lambda x: x is not None, deps)
+        ), "Everything should be loaded successfully, without surprise Nones"

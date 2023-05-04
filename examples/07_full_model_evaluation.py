@@ -5,20 +5,27 @@ Export controlled - see license file
 import importlib
 from logging import getLogger
 from pathlib import Path
-from pandas import DataFrame
 
 import torch
-from providence.dataloaders import BackblazeDataLoaders, ProvidenceDataLoader
+from pandas import DataFrame
+
+from providence.dataloaders import BackblazeDataLoaders
+from providence.dataloaders import ProvidenceDataLoader
 from providence.datasets.adapters import BackblazeQuarter
 from providence.datasets.core import ProvidenceDataset
 from providence.distributions import Weibull
-from providence.paper_reproductions import BackblazeTransformer, BackblazeTransformerOptimizer, GeneralMetrics
-from providence.training import LossAggregates, use_gpu_if_available
+from providence.paper_reproductions import BackblazeTransformer
+from providence.paper_reproductions import BackblazeTransformerOptimizer
+from providence.paper_reproductions import GeneralMetrics
+from providence.training import LossAggregates
+from providence.training import use_gpu_if_available
 from providence.utils import now_dt_string
-from providence_utils.callbacks import (
-    CachedIntervalMetricsVisualizer, EarlyStopping, EmergencyBrake, ModelCheckpointer, NthEpochLoggerCallback,
-    WriteModelOutputs
-)
+from providence_utils.callbacks import CachedIntervalMetricsVisualizer
+from providence_utils.callbacks import EarlyStopping
+from providence_utils.callbacks import EmergencyBrake
+from providence_utils.callbacks import ModelCheckpointer
+from providence_utils.callbacks import NthEpochLoggerCallback
+from providence_utils.callbacks import WriteModelOutputs
 from providence_utils.visualization import plot_loss_curves
 
 # this is a weird import, just so we don't duplicate a bunch of code
@@ -41,7 +48,7 @@ callbacks = [
     WriteModelOutputs(optimizer.num_epochs // 2, output_dir, logger=logger),
     ModelCheckpointer(output_dir=(output_dir / "model-checkpoints"), track="val_loss", logger=logger),
     EarlyStopping(patience=20, track="val_loss"),
-    EmergencyBrake(20, 1.),  # our weibull loss takes a bit longer to bit below 1.0, but still begets strong results
+    EmergencyBrake(20, 1.0),  # our weibull loss takes a bit longer to bit below 1.0, but still begets strong results
 ]
 
 losses: LossAggregates = cb_training_example.callback_training(model, optimizer, backblaze_dls, callbacks)
@@ -49,7 +56,12 @@ losses: LossAggregates = cb_training_example.callback_training(model, optimizer,
 # To get the metrics that we use in the paper
 metrics = GeneralMetrics(model, backblaze_dls.test_ds, losses)
 
-plot_loss_curves(losses.training_losses, losses.validation_losses, str(output_dir / "learning_curves.png"), y_lim=50)
+plot_loss_curves(
+    losses.training_losses,
+    losses.validation_losses,
+    str(output_dir / "learning_curves.png"),
+    y_lim=50,
+)
 """
 At this point, the model is trained and we have many outputs to review the progression of training.
 The metrics that are visualized are under directories of their name, roughly "outputs-{dtstring}/plot-{metric}/".
@@ -61,11 +73,11 @@ Assessing the visualizations and the metrics leads us to ascertain the qualitati
 """
 
 # COMMENT: demonstrative of how to design an inference engine with Providence primitives. It does NOT actually run
-from providence.visualization import plot_weibull
+# from providence.visualization import plot_weibull
 
-new_devices: DataFrame = ... # initialized with new devices
+new_devices = DataFrame()  # initialized with new devices
 
-ds = ProvidenceDataset(new_devices, ...)
+ds = ProvidenceDataset(new_devices, ...)  # type: ignore[arg-type, call-arg, misc]
 
 dl = ProvidenceDataLoader(ds, batch_size=1)
 
@@ -75,8 +87,8 @@ dl = ProvidenceDataLoader(ds, batch_size=1)
 # recall "model" is in scope, initialized and trained up above.
 inferred_weibull_params = [model(inputs, lengths) for (inputs, lengths, _) in dl]
 
-torch.save()
+# torch.save() would be called here
 
 predicted_rul = [Weibull.mode(params) for params in inferred_weibull_params]
 
-plot_weibull()
+# plot_weibull() would be called here

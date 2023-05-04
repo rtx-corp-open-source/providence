@@ -6,12 +6,16 @@ You use others at your own risk.
 Export controlled - see license file
 """
 from .module import ProvidenceModule
-from .rnn import ProvidenceGRU, ProvidenceLSTM, ProvidenceRNN, ProvidenceVanillaRNN
+from .rnn import ProvidenceGRU
+from .rnn import ProvidenceLSTM
+from .rnn import ProvidenceRNN
+from .rnn import ProvidenceVanillaRNN
 from .transformer import ProvidenceTransformer
-from .weibull import WeibullActivation, WeibullHead
+from .weibull import WeibullActivation
+from .weibull import WeibullHead
 
 __all__ = [
-    'ProvidenceGRU',
+    "ProvidenceGRU",
     "ProvidenceLSTM",
     "ProvidenceModule",
     "ProvidenceRNN",

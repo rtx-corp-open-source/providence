@@ -4,11 +4,12 @@ Export controlled - see license file
 """
 from time import perf_counter
 
-from providence.datasets.adapters import BackblazeQuarter
-from providence.dataloaders import BackblazeDataLoaders
-from providence.training import use_gpu_if_available
-from providence.utils import now_dt_string, set_seed
 from providence import paper_reproductions
+from providence.dataloaders import BackblazeDataLoaders
+from providence.datasets.adapters import BackblazeQuarter
+from providence.training import use_gpu_if_available
+from providence.utils import now_dt_string
+from providence.utils import set_seed
 
 
 def time_training_full_example(n_laps: int = 5, random_seed: int = 1234):
@@ -31,9 +32,11 @@ def time_training_full_example(n_laps: int = 5, random_seed: int = 1234):
         start_time = perf_counter()
         paper_reproductions.BackblazeTraining(model, model_optim, dataloaders)
         training_time = perf_counter() - start_time
-        training_run_metrics.append(training_time)
-        
+
         completion_time = now_dt_string()
 
-        metrics = {"completion_time": completion_time, "training_seconds": training_time}
+        metrics = {
+            "completion_time": completion_time,
+            "training_seconds": training_time,
+        }
         training_run_metrics.append(metrics)

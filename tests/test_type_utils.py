@@ -4,6 +4,7 @@ Export controlled - see license file
 """
 from providence.type_utils import once
 
+
 class TestOnce:
     def test__invoked_only_once(self):
         @once

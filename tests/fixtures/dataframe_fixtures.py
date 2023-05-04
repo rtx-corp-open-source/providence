@@ -3,10 +3,11 @@
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-import pytest
-import pandas as pd
-import numpy as np
 from typing import List
+
+import numpy as np
+import pandas as pd
+import pytest
 
 
 # TODO: rename, this should be list of ndarrays
@@ -19,8 +20,9 @@ def list_of_dataframes() -> List[np.ndarray]:
 
 
 @pytest.fixture(scope="module")
-def list_of_targets(list_of_dataframes) -> List[pd.DataFrame]:
+def list_of_targets(list_of_dataframes) -> List[np.ndarray]:
     target_list = []
     for df in list_of_dataframes:
-        target_list.append(pd.DataFrame(np.random.random((df.shape[0], 1)), columns=["E"]))
-    return [x.values for x in target_list]
+        target_list.append(np.random.random((df.shape[0], 1)))
+    # return [x.values for x in target_list]
+    return target_list

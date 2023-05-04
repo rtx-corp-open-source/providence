@@ -3,17 +3,20 @@
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-from providence.dataloaders import ProvidenceDataLoader
-from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES, NASA_METADATA_COLUMNS, NasaTurbofanTest, load_nasa_dataframe
-from providence.datasets.backblaze import BackblazeDataset
-
 import numpy as np
 import pytest
 import torch as pt
-from providence import datasets
-from providence.datasets.core import DataSubsetId, ProvidenceDataset
-from providence.datasets.nasa import NasaDataset
 
+from providence import datasets
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES
+from providence.datasets.adapters import load_nasa_dataframe
+from providence.datasets.adapters import NASA_METADATA_COLUMNS
+from providence.datasets.adapters import NasaTurbofanTest
+from providence.datasets.backblaze import BackblazeDataset
+from providence.datasets.core import DataSubsetId
+from providence.datasets.core import ProvidenceDataset
+from providence.datasets.nasa import NasaDataset
 
 
 @pytest.fixture
@@ -26,6 +29,7 @@ def nasa_test():
     return NasaDataset(DataSubsetId.Test)
 
 
+@pytest.mark.requires_data
 class TestNasaDataset:
     # TODO: this whole test needs reworking or deletion. It's good documentation.
     def test___init__(self):
@@ -48,8 +52,8 @@ class TestNasaDataset:
         assert got_len == want_len
 
     def test__read_data(self):
-        train_df = load_nasa_dataframe(NasaTurbofanTest.FD001, split_name="train", data_root='./.data')
-        test_df = load_nasa_dataframe(NasaTurbofanTest.FD001, split_name="test", data_root='./.data')
+        train_df = load_nasa_dataframe(NasaTurbofanTest.FD001, split_name="train", data_root="./.data")
+        test_df = load_nasa_dataframe(NasaTurbofanTest.FD001, split_name="test", data_root="./.data")
 
         got_train = train_df.drop(columns=["RUL"]).shape
         got_test = test_df.drop(columns=["RUL"]).shape
@@ -63,8 +67,7 @@ class TestNasaDataset:
     def test__load_from_raw(self):
         """Test that the loaded, near-raw Dataframe is exactly what it should be."""
 
-        got = load_nasa_dataframe(NasaTurbofanTest.FD001, split_name="train", data_root='./.data').values[0, :-1]
-    
+        got = load_nasa_dataframe(NasaTurbofanTest.FD001, split_name="train", data_root="./.data").values[0, :-1]
 
         want_array = np.array(
             [
@@ -143,7 +146,7 @@ class TestNasaDataset:
         assert pt.allclose(got_feature_sum.to(pt.double), want_feature_sum.to(pt.double), rtol=1e-4)
 
 
-@pytest.mark.download_test
+@pytest.mark.requires_data
 class TestBackblazeDataset:
     @pytest.fixture
     def backblaze_train(self):

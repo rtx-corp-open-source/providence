@@ -26,10 +26,14 @@ class TestActivation:
         assert layer.input_size == 20
 
 
-@pytest.mark.parametrize("providence_layer", [(weibull.WeibullActivation, {"input_size": 20}),
-    (weibull.WeibullHead, {}),
-    (weibull.WeibullHead2, {})
-])
+@pytest.mark.parametrize(
+    "providence_layer",
+    [
+        (weibull.WeibullActivation, {"input_size": 20}),
+        (weibull.WeibullHead, {}),
+        (weibull.WeibullHead2, {}),
+    ],
+)
 def test_weibull_activations(providence_layer, input_tensor):
     layer, kwargs = providence_layer
     layer = layer(**kwargs)
@@ -37,6 +41,7 @@ def test_weibull_activations(providence_layer, input_tensor):
 
     assert alpha.shape == (TIME_STEPS, BATCH_SIZE, 1)
     assert beta.shape == (TIME_STEPS, BATCH_SIZE, 1)
+
 
 def test_weibull3_activations(input_tensor):
     layer = weibull.Weibull3Head()

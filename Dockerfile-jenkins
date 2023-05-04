@@ -1,46 +1,33 @@
-# **Raytheon Technologies proprietary**
-# Export controlled - see license file
-FROM ubuntu:19.10
+# syntax = docker/dockerfile:latest
+
+FROM registry.access.redhat.com/ubi8/ubi-init
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
-ARG DEBIAN_FRONTEND=noninteractive
 
-ENV https_proxy ${HTTPS_PROXY}
-ENV http_proxy ${HTTP_PROXY}
-ENV no_proxy ${NO_PROXY}
+ENV https_proxy=${HTTPS_PROXY}
+ENV http_proxy=${HTTP_PROXY}
+ENV no_proxy=${NO_PROXY}
 
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV NO_PROXY=${NO_PROXY}
 
-RUN apt-get update -y
-RUN apt-get -y install git make curl wget build-essential libffi-dev libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
- libsqlite3-dev llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev
-RUN apt-get -y install python3 python3-pip zip unzip
-RUN apt-get -y install python3 python3-pip
 
-RUN apt-get install -y software-properties-common
-RUN add-apt-repository universe
-RUN add-apt-repository main
-RUN apt-get update
-RUN apt-get -y install gcc libatlas-base-dev liblapack-dev libblas-dev
 
-COPY pip.conf /
-ENV PIP_CONFIG_FILE /pip.conf
+# install gcc and others
+RUN yum -y install --disableplugin=subscription-manager \
+     gcc openssl-devel bzip2-devel libffi-devel autoconf automake gcc-c++ make curl wget git vim sqlite-devel python38 python38-devel zip unzip ncurses patch  tar zlib zlib-devel  \
+     && yum --disableplugin=subscription-manager clean all
 
-RUN python3 -m pip install --upgrade setuptools
-RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install --upgrade wheel
-RUN git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+RUN --mount=type=secret,id=artifactory_rpmrepo,dst=/etc/yum.repos.d/dx-artifactory-o.repo cp  /etc/yum.repos.d/dx-artifactory-o.repo /etc/yum.repos.d/dx-artifactory.repo
+RUN chown root /etc/yum.repos.d/dx-artifactory.repo
+RUN chmod 0600 /etc/yum.repos.d/dx-artifactory.repo
 
-ENV PYENV_ROOT="/root/.pyenv"
-ENV PATH="$PYENV_ROOT/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN pyenv install --verbose 3.7.2
-RUN pyenv install --verbose 3.6.8
-RUN pyenv install --verbose 3.5.6
-RUN pyenv local 3.7.2 3.6.8 3.5.6
+RUN yum -y install --disableplugin=subscription-manager \
+  azure-cli pandoc-common pandoc \
+  && yum --disableplugin=subscription-manager clean all
 
 # Install Sonar Scanner
 ENV SONAR_SCANNER_VERSION=4.2.0.1873
@@ -53,30 +40,77 @@ RUN curl -LO \
   && ln -s -f /opt/sonar-scanner/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin/sonar-scanner /usr/local/bin/. \
   && ln -s -f /opt/sonar-scanner/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/jre/bin/java /usr/local/bin/.
 
-RUN addgroup --gid 1000 jenkins
+  #=====================
+# Get docker binaries
+#=====================
+# Var `DOCKER` points to which binary to use at runtime
+ENV DOCKER_HOST="unix:///var/run/docker.sock" \
+    DOCKER_BUCKET="download.docker.com" \
+    DOCKER="19.03.9"
+
+RUN set -x \
+        && DOCKER_VERSION="19.03.9" \
+        && curl -fSL "https://${DOCKER_BUCKET}/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" \
+                -o docker.tgz \
+        && tar -xzvf docker.tgz \
+        && mv docker/docker /usr/bin/docker-${DOCKER_VERSION} \
+        && rm -rf docker/ && rm docker.tgz \
+        && ln -s /usr/bin/docker-${DOCKER_VERSION} /usr/bin/docker \
+        && docker-${DOCKER_VERSION} --version | grep "${DOCKER_VERSION}"
+
+RUN docker --version
+
+RUN alternatives --set python3 /usr/bin/python3.8
+
+RUN locale -a
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+
+COPY pip.conf /
+ENV PIP_CONFIG_FILE /pip.conf
+
+RUN --mount=type=secret,id=artifactory_secret,dst=/root/.artifactory_secret  cp /root/.artifactory_secret /root/.netrc
+RUN chown root /root/.netrc
+RUN chmod 0600 /root/.netrc
+
+RUN python3 -m pip install --upgrade setuptools
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade wheel
+RUN python3 -m pip install --upgrade twine
+RUN git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+
+ENV PYENV_ROOT="/root/.pyenv"
+ENV PATH="$PYENV_ROOT/bin:$PATH"
+RUN eval "$(pyenv init -)"
+RUN pyenv install  3.7.12
+RUN pyenv install  3.8.12
+RUN pyenv install  3.9.9
+RUN pyenv global 3.8.12
+RUN pyenv local 3.7.12 3.8.12 3.9.9
+
+# install dependencies
+RUN python3 -m pip install cython
+RUN python3 -m pip install numpy
+RUN python3 -m pip install pystan
+
+# Run testing in Python
+RUN python3 -m pip install tox==3.28.0 tox-pyenv pytest-html pytest-benchmark elasticsearch pytest-benchmark[histogram] pygal pygaljs six --ignore-installed
+
+RUN groupadd --gid 1000 jenkins
 RUN useradd -u 1000 -g 1000 --home /home/jenkins --shell /bin/bash jenkins --no-create-home
 RUN usermod -aG jenkins root \
     && mkdir -p /home/jenkins
 
 RUN echo "jenkins ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# copy the files we need
-COPY requirements.txt ./requirements.txt
-COPY requirements-dev.txt ./requirements-dev.txt
-
-# install dependencies
-RUN python3 -m pip install -r requirements-dev.txt
-RUN python3 -m pip install -r requirements.txt
-
-# copy the rest
-#COPY . /providence
-#WORKDIR /providence
-
-# Run testing in Python
-RUN python3 -m pip install tox tox-pyenv pytest-cov coverage pytest-html  pytest-benchmark elasticsearch pytest-benchmark[histogram] pygal pygaljs
-
 ENV PATH="/home/jenkins/.local/bin:/usr/local/bin:$PATH"
 
 RUN chown jenkins:jenkins -R /home/jenkins
+
+RUN rm -rf /root/.netrc
+RUN rm -rf /root/.artifactory_secret
+RUN rm -rf /etc/yum.repos.d/dx-artifactory.repo
+RUN rm -rf /etc/yum.repos.d/dx-artifactory-o.repo
 
 USER jenkins

@@ -9,26 +9,33 @@ from pathlib import Path
 
 import mlflow
 import torch as pt
-from providence.dataloaders import CustomProvidenceDataloaders, ProvidenceDataLoader
-from providence.datasets.adapters import DS_NAME_TO_FEATURE_COUNT
-from providence.datasets import NasaDatasets
-from providence.loss import DiscreteWeibullMSELoss
-from providence.nn import ProvidenceGRU, ProvidenceModule, ProvidenceTransformer
-from providence.paper_reproductions import GeneralMetrics
-from providence.training import OptimizerWrapper, set_torch_default_dtypes, use_gpu_if_available, training_epoch
-from providence.utils import now_dt_string, set_seed
-from providence_utils.hyperparameter_sweeper import nest_keys, HyperparameterSweeper
-from providence.type_utils import type_name
 
+from providence.dataloaders import CustomProvidenceDataloaders
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets import NasaDatasets
+from providence.datasets.adapters import DS_NAME_TO_FEATURE_COUNT
+from providence.loss import DiscreteWeibullMSELoss
+from providence.nn import ProvidenceGRU
+from providence.nn import ProvidenceModule
+from providence.nn import ProvidenceTransformer
+from providence.paper_reproductions import GeneralMetrics
+from providence.training import OptimizerWrapper
+from providence.training import set_torch_default_dtypes
+from providence.training import training_epoch
+from providence.training import use_gpu_if_available
+from providence.type_utils import type_name
+from providence.utils import now_dt_string
+from providence.utils import set_seed
+from providence_utils.hyperparameter_sweeper import HyperparameterSweeper
+from providence_utils.hyperparameter_sweeper import nest_keys
+from providence_utils.mlflow import create_or_set_experiment
+from providence_utils.mlflow import try_log_artifacts
 
 ################################################################################
 #
 # MLFLow Setup
 #
 ################################################################################
-
-from providence_utils.mlflow import create_or_set_experiment, try_log_artifacts
-from providence.training import training_epoch
 
 
 def mlflow_epoch(dls, model, optimizer, *, step: int = None, loss_criterion=None):
@@ -70,7 +77,9 @@ dm._DEBUG = False
 
 metadata_to_log["data"]["global_seed_at_init"] = pt.initial_seed()
 
-GLOBAL_train_ds, GLOBAL_val_ds = NasaDatasets(data_root="/dbfs/FileStore/datasets/providence", )
+GLOBAL_train_ds, GLOBAL_val_ds = NasaDatasets(
+    data_root="/dbfs/FileStore/datasets/providence",
+)
 GLOBAL_test_ds = GLOBAL_val_ds
 metadata_to_log["data"]["name"] = "NASA"
 
@@ -103,20 +112,19 @@ from providence.training import LossAggregates
 # trainer = Trainer(mlflow_epoch)
 
 run_config = {
-    "model":
-        {
-            "n_heads": 2,
-            "n_layers": 1,
-            "n_features": DS_NAME_TO_FEATURE_COUNT["nasa"],
-            "n_embedding": 64,  # down from 128
-            "max_seq_len": 700,
-        },
+    "model": {
+        "n_heads": 2,
+        "n_layers": 1,
+        "n_features": DS_NAME_TO_FEATURE_COUNT["nasa"],
+        "n_embedding": 64,  # down from 128
+        "max_seq_len": 700,
+    },
     "optimizer": {
         "learning_rate": 3e-2,
         "batch_size": 64,  # down from 128
         "num_epochs": 80,
     },
-    "dataset": "nasa"
+    "dataset": "nasa",
 }
 
 # NOTE: just two function to keep things straight fortard
@@ -130,7 +138,7 @@ def make_transformer_model() -> ProvidenceModule:
         n_attention_heads=run_config["model"]["n_heads"],
         dropout=0,
         positional_encoding_dimension=710,
-        device=use_gpu_if_available()
+        device=use_gpu_if_available(),
     )
     return model
 
@@ -141,12 +149,11 @@ def make_rnn_model() -> ProvidenceModule:
         run_config["model"]["n_embedding"],
         run_config["model"]["n_layers"],
         dropout=0,
-        device=use_gpu_if_available()
+        device=use_gpu_if_available(),
     )
 
 
 for make_model in [make_transformer_model, make_rnn_model]:
-
     new_loss = DiscreteWeibullMSELoss()
 
     with mlflow.start_run(experiment_id=create_or_set_experiment(EXPERIMENT_NAME.format("MSE Check"))):
@@ -160,7 +167,7 @@ for make_model in [make_transformer_model, make_rnn_model]:
                 lr=run_config["optimizer"]["learning_rate"],
             ),
             batch_size=run_config["optimizer"]["batch_size"],
-            num_epochs=run_config["optimizer"]["num_epochs"]
+            num_epochs=run_config["optimizer"]["num_epochs"],
         )
         dls_to_use = global_dls()
         output_dir = ROOT_DIR / now_dt_string()
@@ -169,7 +176,13 @@ for make_model in [make_transformer_model, make_rnn_model]:
         model.to(model.device)
         loss_agg = LossAggregates([], [])
         for epoch_i in range(1, opt_wrapper.num_epochs + 1):
-            epoch_losses = mlflow_epoch(dls_to_use, model, opt_wrapper.opt, step=epoch_i, loss_criterion=new_loss)
+            epoch_losses = mlflow_epoch(
+                dls_to_use,
+                model,
+                opt_wrapper.opt,
+                step=epoch_i,
+                loss_criterion=new_loss,
+            )
             loss_agg.append_losses(epoch_losses)
 
         # model.to('cpu')

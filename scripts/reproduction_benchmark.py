@@ -13,26 +13,45 @@ For engineering:
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Type
-import pandas as pd
+from typing import Callable
+from typing import Type
 
+import pandas as pd
 import torch as pt
-from providence.dataloaders import CustomProvidenceDataloaders, ProvidenceDataLoader
-from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES, NASA_FEATURE_NAMES
+
+from providence.dataloaders import CustomProvidenceDataloaders
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES
+from providence.datasets.adapters import NASA_FEATURE_NAMES
 from providence.datasets.nasa import NasaDatasets
 from providence.nn.module import ProvidenceModule
-from providence.nn.rnn import ProvidenceGRU, ProvidenceLSTM, ProvidenceVanillaRNN
+from providence.nn.rnn import ProvidenceGRU
+from providence.nn.rnn import ProvidenceLSTM
+from providence.nn.rnn import ProvidenceVanillaRNN
 from providence.nn.transformer import ProvidenceTransformer
 from providence.paper_reproductions import GeneralMetrics
-from providence.training import OptimizerWrapper, set_torch_default_dtypes, training_epoch, use_gpu_if_available
+from providence.training import OptimizerWrapper
+from providence.training import set_torch_default_dtypes
+from providence.training import training_epoch
+from providence.training import use_gpu_if_available
 from providence.types import DataLoaders
-from providence.utils import configure_logger_in_dir, now_dt_string, set_seed
-from providence_utils.callbacks import DeferrableEarlyStopping, EmergencyBrake, IntervalMetricsVisualizer, LearningCurveTracker, LearningRateScheduler, ModelCheckpointer, WriteModelOutputs
+from providence.utils import configure_logger_in_dir
+from providence.utils import now_dt_string
+from providence.utils import set_seed
+from providence_utils.callbacks import DeferrableEarlyStopping
+from providence_utils.callbacks import EmergencyBrake
+from providence_utils.callbacks import IntervalMetricsVisualizer
+from providence_utils.callbacks import LearningCurveTracker
+from providence_utils.callbacks import LearningRateScheduler
+from providence_utils.callbacks import ModelCheckpointer
+from providence_utils.callbacks import WriteModelOutputs
 from providence_utils.hyperparameter_sweeper import nest_keys
-from providence_utils.trainer import Trainer, transformer_epoch, EpochInterface
+from providence_utils.trainer import EpochInterface
+from providence_utils.trainer import Trainer
+from providence_utils.trainer import transformer_epoch
+
 # NOTE: IMPORTANT. this is what we use, and is pretty standard in research
 set_torch_default_dtypes(pt.float32)
 
@@ -60,8 +79,14 @@ def optimizer_default_config() -> dict:
 
 
 def do_model_run(
-    model_type: Type[ProvidenceModule], get_dls: Callable[[], DataLoaders], random_seed: int, optim_params: dict,
-    model_params: dict, callback_config: dict, outputs_root_dir: Path, epoch_definition: EpochInterface
+    model_type: Type[ProvidenceModule],
+    get_dls: Callable[[], DataLoaders],
+    random_seed: int,
+    optim_params: dict,
+    model_params: dict,
+    callback_config: dict,
+    outputs_root_dir: Path,
+    epoch_definition: EpochInterface,
 ):
     set_seed(random_seed)
     model = model_type(**model_params, device=use_gpu_if_available())
@@ -83,16 +108,23 @@ def do_model_run(
     logger = configure_logger_in_dir(output_dir)
     cbs = [
         LearningRateScheduler(
-            optimizer.opt, T_mult=optim_params["schedule_T_mult"], eta_min=optim_params["schedule_min"]
+            optimizer.opt,
+            T_mult=optim_params["schedule_T_mult"],
+            eta_min=optim_params["schedule_min"],
         ),
         IntervalMetricsVisualizer(callback_config["visualization_freq"], output_dir, logger=logger),
-        WriteModelOutputs(callback_config["model_output_freq"], output_dir, logger=logger, verbose=False),
+        WriteModelOutputs(
+            callback_config["model_output_freq"],
+            output_dir,
+            logger=logger,
+            verbose=False,
+        ),
         ModelCheckpointer(
             output_dir=(output_dir / "model-checkpoints"),
             track=callback_config["tracking_metric"],
             logger=logger,
             verbose=True,
-            keep_old=5
+            keep_old=5,
         ),
         DeferrableEarlyStopping(
             patience=callback_config["early_stopping.patience"],
@@ -100,7 +132,7 @@ def do_model_run(
             defer_until=callback_config["early_stopping.defer"],
         ),
         EmergencyBrake(callback_config["ebrake_epoch"], callback_config["ebrake_requisite_loss"]),
-        LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve"))
+        LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve")),
     ]
     trainer = Trainer(epoch_definition)
     # run_config to something we can log to mlflow
@@ -124,7 +156,10 @@ def do_model_run(
     return model, model_metrics
 
 
-feature_counts = {"nasa": len(NASA_FEATURE_NAMES), "backblaze": len(BACKBLAZE_FEATURE_NAMES)}
+feature_counts = {
+    "nasa": len(NASA_FEATURE_NAMES),
+    "backblaze": len(BACKBLAZE_FEATURE_NAMES),
+}
 
 
 # NOTE one of these is redundant, as its covered in the paper_reproductions module
@@ -134,7 +169,7 @@ def NASA_Aggregate_VanillRNN(data_root_path: str, outputs_root: str):
     Arguments:
         data_root_path: the root for the download of the dataset. Needs write permissions
         outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-    
+
     Return:
         model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
             with the file model checkpoint output by `ModelCheckpointer`
@@ -154,12 +189,12 @@ def NASA_Aggregate_VanillRNN(data_root_path: str, outputs_root: str):
 
     optim_params = {
         **optimizer_default_config(),
-        'batch_size': 4,
-        'learning_rate': 0.003,
-        'num_epochs': 200,
-        'schedule_T_mult': 2,
-        'schedule_min': 1e-05,
-        'type': pt.optim.Adam,
+        "batch_size": 4,
+        "learning_rate": 0.003,
+        "num_epochs": 200,
+        "schedule_T_mult": 2,
+        "schedule_min": 1e-05,
+        "type": pt.optim.Adam,
     }
 
     model, metrics = do_model_run(
@@ -175,17 +210,19 @@ def NASA_Aggregate_VanillRNN(data_root_path: str, outputs_root: str):
         ),
         callback_config=callback_default_config(),
         outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch
+        epoch_definition=training_epoch,
     )
     return model, metrics
 
 
-NASA_Aggregate_VanillRNN.best_metrics = pd.DataFrame({
-    "MSE": [2008.5],
-    "MFE": [-0.215],
-    "SMAPE": [0.13],
-    "SMPE": [0.003],
-}) # yapf: disable
+NASA_Aggregate_VanillRNN.best_metrics = pd.DataFrame(
+    {
+        "MSE": [2008.5],
+        "MFE": [-0.215],
+        "SMAPE": [0.13],
+        "SMPE": [0.003],
+    }
+)  # yapf: disable
 
 
 def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
@@ -193,7 +230,7 @@ def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
     Arguments:
         data_root_path: the root for the download of the dataset. Needs write permissions
         outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-    
+
     Return:
         model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
             with the file model checkpoint output by `ModelCheckpointer`
@@ -213,12 +250,12 @@ def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
 
     optim_params = {
         **optimizer_default_config(),
-        'batch_size': 2,
-        'learning_rate': 1e-3,
-        'num_epochs': 50,
-        'schedule_T_mult': 2,
-        'schedule_min': 1e-05,
-        'type': pt.optim.Adam,
+        "batch_size": 2,
+        "learning_rate": 1e-3,
+        "num_epochs": 50,
+        "schedule_T_mult": 2,
+        "schedule_min": 1e-05,
+        "type": pt.optim.Adam,
     }
 
     model, metrics = do_model_run(
@@ -234,17 +271,19 @@ def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
         ),
         callback_config=callback_default_config(),
         outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch
+        epoch_definition=training_epoch,
     )
     return model, metrics
 
 
-NASA_Aggregate_GRU.best_metrics = pd.DataFrame({
-    "MSE": [2008.5],
-    "MFE": [-0.215],
-    "SMAPE": [0.13],
-    "SMPE": [0.003],
-}) # yapf: disable
+NASA_Aggregate_GRU.best_metrics = pd.DataFrame(
+    {
+        "MSE": [2008.5],
+        "MFE": [-0.215],
+        "SMAPE": [0.13],
+        "SMPE": [0.003],
+    }
+)  # yapf: disable
 
 
 def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
@@ -252,7 +291,7 @@ def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
     Arguments:
         data_root_path: the root for the download of the dataset. Needs write permissions
         outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-    
+
     Return:
         model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
             with the file model checkpoint output by `ModelCheckpointer`
@@ -272,12 +311,12 @@ def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
 
     optim_params = {
         **optimizer_default_config(),
-        'batch_size': 4,
-        'learning_rate': 3e-3,
-        'num_epochs': 40,
-        'schedule_T_mult': 2,
-        'schedule_min': 1e-05,
-        'type': pt.optim.Adam,
+        "batch_size": 4,
+        "learning_rate": 3e-3,
+        "num_epochs": 40,
+        "schedule_T_mult": 2,
+        "schedule_min": 1e-05,
+        "type": pt.optim.Adam,
     }
 
     model, metrics = do_model_run(
@@ -293,22 +332,26 @@ def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
         ),
         callback_config=callback_default_config(),
         outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch
+        epoch_definition=training_epoch,
     )
     return model, metrics
 
 
-NASA_Aggregate_LSTM.best_metrics = pd.DataFrame({
-    "MSE": [2008.5],
-    "MFE": [-0.215],
-    "SMAPE": [0.13],
-    "SMPE": [0.003],
-}) # yapf: disable
+NASA_Aggregate_LSTM.best_metrics = pd.DataFrame(
+    {
+        "MSE": [2008.5],
+        "MFE": [-0.215],
+        "SMAPE": [0.13],
+        "SMPE": [0.003],
+    }
+)  # yapf: disable
 
 # TODO: fill in from the Confluence page (https://confluence.utc.com/display/NAPD/Providence+Reproducibility)
 
+
 def Backblaze_VanillaRNN():
     ...
+
 
 Backblaze_VanillaRNN.best_metrics = pd.DataFrame(...)
 
@@ -316,11 +359,13 @@ Backblaze_VanillaRNN.best_metrics = pd.DataFrame(...)
 def Backblaze_LSTM():
     ...
 
+
 Backblaze_LSTM.best_metrics = pd.DataFrame(...)
 
 
 def Backblaze_GRU():
     ...
+
 
 Backblaze_GRU.best_metrics = pd.DataFrame(...)
 
@@ -328,16 +373,19 @@ Backblaze_GRU.best_metrics = pd.DataFrame(...)
 def BackblazeExtended_VanillaRNN():
     ...
 
+
 BackblazeExtended_VanillaRNN.best_metrics = pd.DataFrame(...)
 
 
 def BackblazeExtended_LSTM():
     ...
 
+
 BackblazeExtended_LSTM.best_metrics = pd.DataFrame(...)
 
 
 def BackblazeExtended_GRU():
     ...
+
 
 BackblazeExtended_GRU.best_metrics = pd.DataFrame(...)

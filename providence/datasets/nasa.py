@@ -60,16 +60,23 @@ Implementation is
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
+from typing import Literal
 from typing import Tuple
 
-from pandas import DataFrame
 from pandas import concat as concat_dataframes
+from pandas import DataFrame
 
-from providence.datasets.adapters import (
-    NASA_FEATURE_NAMES, T_NASA_SUBSET_ID, NasaTurbofanTest, get_nasa_subset_normalization_stats, load_nasa_dataframe
-)
-from providence.datasets.core import DataFrameSplit, DataSubsetId, ProvidenceDataset
-from providence.datasets.utils import normalize_by_device, normalize_with_stats
+from providence.datasets.adapters import get_nasa_subset_normalization_stats
+from providence.datasets.adapters import load_nasa_dataframe
+from providence.datasets.adapters import NASA_FEATURE_NAMES
+from providence.datasets.adapters import NasaTurbofanTest
+from providence.datasets.adapters import T_NASA_SUBSET_ID
+from providence.datasets.core import DataFrameSplit
+from providence.datasets.core import DataSubsetId
+from providence.datasets.core import ProvidenceDataset
+from providence.datasets.utils import normalize_by_device
+from providence.datasets.utils import normalize_with_stats
+from providence.utils import validate
 
 ################################################################################
 #
@@ -77,28 +84,45 @@ from providence.datasets.utils import normalize_by_device, normalize_with_stats
 #
 ################################################################################
 
+
 def NasaDataset(subset_choice: DataSubsetId, *, data_dir: str = "./.data") -> ProvidenceDataset:
-    """
-    Prepare the Nasa Aggregate Dataset, either 'train' or 'test' based on `subset_choice`.
-    The functionality herein is akin to the following idea:
+    """Prepare the NASA Aggregate Dataset, either 'train' or 'test' based on `subset_choice`.
+
+    The functionality herein is akin to effectively:
     >>> pipeline(load_dataframes, normalization, lambda df: df.assign(event=1), _NasaProvidenceDataset)
+
+    Args:
+        subset_choice (DataSubsetId): returns the training set if `subset_choice=Train`, otherwise the test set
+        data_root (str): the parent directory used for downloading, caching, and retrieving this dataset. Multiple child
+            directories will be created, so ensure adequate permissions when you supply a directory.
+
+    Returns:
+        A ProvidenceDataset for the NASA Data
     """
-    train_or_test = 'train' if subset_choice == DataSubsetId.Train else 'test'
+    train_or_test = "train" if subset_choice == DataSubsetId.Train else "test"  # type: Literal["train", "test"]
     sub_dfs = [
         load_nasa_dataframe(nasa_subset, split_name=train_or_test, data_root=data_dir)
         for nasa_subset in NasaTurbofanTest.all()
     ]
     all_df = concat_dataframes(sub_dfs)
-    norm_stats = get_nasa_subset_normalization_stats('all')
-    normed = normalize_with_stats(all_df, norm_stats, method='standardize', feature_names=NASA_FEATURE_NAMES)
+    norm_stats = get_nasa_subset_normalization_stats("all")
+    normed = normalize_with_stats(all_df, norm_stats, method="standardize", feature_names=NASA_FEATURE_NAMES)
     # NOTE: event = 1 because we _know_ the engine will fail at the end of its run. We've just censored that.
     ds = _NasaProvidenceDataset(normed.assign(event=1))
 
     return ds
 
 
-def NasaDatasets(*, data_root: str = './.data') -> Tuple[ProvidenceDataset, ProvidenceDataset]:
-    "Creates the NASA Aggregate train-test datasets"
+def NasaDatasets(*, data_root: str = "./.data") -> Tuple[ProvidenceDataset, ProvidenceDataset]:
+    """Constructs the NASA Aggregate train-test datasets
+
+    Args:
+        data_root (str): the parent directory used for downloading, caching, and retrieving this dataset. Multiple child
+            directories will be created, so ensure adequate permissions when you supply a directory.
+
+    Returns:
+        Tuple[ProvidenceDataset, ProvidenceDataset] of the NASA train and test datasets.
+    """
     splits_at_tests = [
         load_nasa_train_test_split(test_number, data_root=data_root) for test_number in NasaTurbofanTest.all()
     ]
@@ -106,18 +130,40 @@ def NasaDatasets(*, data_root: str = './.data') -> Tuple[ProvidenceDataset, Prov
         train=concat_dataframes([test_split.train for test_split in splits_at_tests]),
         test=concat_dataframes([test_split.test for test_split in splits_at_tests]),
     )
-    df_split = NasaPreprocessing(df_split, nasa_subset='all')
+    df_split = NasaPreprocessing(df_split, nasa_subset="all")
     df_split = DataFrameSplit(train=df_split.train.assign(event=1), test=df_split.test.assign(event=1))
     train_ds, test_ds = NasaDatasets_from_split(df_split)
     return train_ds, test_ds
 
 
 def NasaPreprocessing(df_splits: DataFrameSplit, *, nasa_subset: T_NASA_SUBSET_ID):
+    """Normalize and shape DataFrames based on statistics of the given ``nasa_subset``
+
+    # TODO(stephen): expand to support optional validation set
+
+
+    Args:
+        df_splits (DataFrameSplit): train and test DataFrames, intended to be for the given ``nasa_subset``
+        nasa_subset (T_NASA_SUBSET_ID): see type definition
+
+    Returns:
+        DataFrameSplit: train, test datasets normalized per the procedure used in the paper
+    """
     norm_stats = get_nasa_subset_normalization_stats(nasa_subset)
     df_splits = DataFrameSplit(
         # normalize per device in the training set,
-        train=normalize_by_device(df_splits.train, entity_id='unit number', method='standardize', feature_names=NASA_FEATURE_NAMES),
-        test=normalize_with_stats(df_splits.test, norm_stats, method='standardize', feature_names=NASA_FEATURE_NAMES)
+        train=normalize_by_device(
+            df_splits.train,
+            entity_id="unit number",
+            method="standardize",
+            feature_names=NASA_FEATURE_NAMES,
+        ),
+        test=normalize_with_stats(
+            df_splits.test,
+            norm_stats,
+            method="standardize",
+            feature_names=NASA_FEATURE_NAMES,
+        ),
     )
 
     return df_splits
@@ -126,31 +172,39 @@ def NasaPreprocessing(df_splits: DataFrameSplit, *, nasa_subset: T_NASA_SUBSET_I
 def NasaFD00XDataset(
     *turbofan_test_num: NasaTurbofanTest,
     subset_choice: DataSubsetId,
-    data_dir: str = './.data',
-):
-    """
-    Create the concatenation of n-many `NasaTurbfanTest` data sets.
-    Use this function if you want just the 'train' or 'test' portion of this CMAPPS data.
-    This was once called `NasaSubsetDataset`, but that was both confusing and opaque to the internal team, let alone external users.
-    The name `FD00X` brings to mind that the runs were named fd00{integer}. The call-site aesthetic is also better
+    data_dir: str = "./.data",
+) -> ProvidenceDataset:
+    """Construct the concatenation of n-many ``NasaTurbfanTest`` data sets.
 
-    This function was designed to facilitate two usages:
-    1. Initialization of a single subset of the PHM08 CMAPPS data, fully normalized and ready for training
-        >>> nasa_trainFD001 = NasaFD00XDataset(NasaTurbofanTest.FD001, subset_choice=DataSubsetId.Train)
-        >>> nasa_trainFD004 = NasaFD00XDataset(NasaTurbofanTest.FD004, subset_choice=DataSubsetId.Train)
-    2. Initialization of any choice of subset of the same CMAPPS data, as Martinsson does in section 4.3 of his thesis
-        >>> martinsson_ds = NasaFD00XDataset(NasaTurbofanTest.FD002, NasaTurbofanTest.FD004, subset_choice=DataSubsetId.Train)
+    Use this function if you want just the 'train' or 'test' portion of this CMAPPS data.
+    The name ``FD00X`` brings to mind that the runs were named fd00{integer}.
+
+    Args:
+        turbofan_test_num (NasaTurbofanTest): the NASA turbofan test runs to be concatenated together to make a dataset
+        data_root (str, optional): the parent directory used for downloading, caching, and retrieving this dataset.
+            Multiple child directories will be created, so ensure adequate permissions when you supply a directory.
+            Defaults to "./.data".
+
+    Returns:
+        A ``ProvidenceDataset`` of the given ``subset_choice`` of tests ``turbofan_test_num``. By example:
+        1. Initialization of a single subset of the PHM08 CMAPPS data, fully normalized and ready for training
+            >>> nasa_trainFD001 = NasaFD00XDataset(NasaTurbofanTest.FD001, subset_choice=DataSubsetId.Train)
+            >>> nasa_trainFD004 = NasaFD00XDataset(NasaTurbofanTest.FD004, subset_choice=DataSubsetId.Train)
+
+        2. Initialization of any choice of subset of the same CMAPPS data, as Martinsson does in section 4.3 of his thesis
+            >>> martinsson_ds = NasaFD00XDataset(NasaTurbofanTest.FD002, NasaTurbofanTest.FD004, subset_choice=DataSubsetId.Train)
     """
-    assert subset_choice != DataSubsetId.Validation
-    train_or_test = 'train' if subset_choice == DataSubsetId.Train else 'test'
+    validate(subset_choice != DataSubsetId.Validation, "Only train and test subset choices are valid.")
+    train_or_test = "train" if subset_choice == DataSubsetId.Train else "test"  # type: Literal["train", "test"]
     # I need this function to return the normalization of n-many turbofan_test-s
     sub_dfs = [
         normalize_with_stats(
             load_nasa_dataframe(nasa_subset, split_name=train_or_test, data_root=data_dir),
             stats=get_nasa_subset_normalization_stats(nasa_subset),
-            method='standardize',
-            feature_names=NASA_FEATURE_NAMES
-        ) for nasa_subset in turbofan_test_num
+            method="standardize",
+            feature_names=NASA_FEATURE_NAMES,
+        )
+        for nasa_subset in turbofan_test_num
     ]
 
     normed = concat_dataframes(sub_dfs)
@@ -160,9 +214,20 @@ def NasaFD00XDataset(
     return _NasaProvidenceDataset(normed)
 
 
-def NasaFD00XDatasets(nasa_subset_num: NasaTurbofanTest,
-                      *,
-                      data_root: str = './.data') -> Tuple[ProvidenceDataset, ProvidenceDataset]:
+def NasaFD00XDatasets(
+    nasa_subset_num: NasaTurbofanTest, *, data_root: str = "./.data"
+) -> Tuple[ProvidenceDataset, ProvidenceDataset]:
+    """Construct the train and test set of the given `nasa_subset_num`, with data downloaded to `data_root`
+
+    Args:
+        nasa_subset_num (NasaTurbfanTest): The run of the NASA simulator that you want train-test from.
+        data_root (str, optional): the parent directory used for downloading, caching, and retrieving this dataset.
+        Multiple child directories will be created, so ensure adequate permissions when you supply a directory.
+        Defaults to "./.data"
+
+    Returns:
+        Tuple[ProvidenceDataset, ProvidenceDataset]: train and test datasets for the given ``NasaTurbofanTest``
+    """
     df_split = load_nasa_train_test_split(nasa_subset_num, data_root=data_root)
     df_split = NasaPreprocessing(df_split, nasa_subset=nasa_subset_num)
     df_split = DataFrameSplit(train=df_split.train.assign(event=1), test=df_split.test.assign(event=1))
@@ -175,21 +240,41 @@ def _NasaProvidenceDataset(df: DataFrame) -> ProvidenceDataset:
         df,
         grouping_field="unit number",
         feature_columns=NASA_FEATURE_NAMES,
-        tte_column='RUL',
-        event_indicator_column='event'
+        tte_column="RUL",
+        event_indicator_column="event",
     )
 
 
 def load_nasa_train_test_split(
-    nasa_subset: NasaTurbofanTest = NasaTurbofanTest.FD001, *, data_root: str = "./.data"
+    nasa_subset: NasaTurbofanTest = NasaTurbofanTest.FD001,
+    *,
+    data_root: str = "./.data",
 ) -> DataFrameSplit:
+    """Load the nasa dataset
+
+    Args:
+        nasa_subset (NasaTurbofanTest): The turbofan test you want loaded
+        data_root (str): Root directory under which a subdirectory for download and caching will be constructed
+            for storage and retrieval of this dataset
+
+    Returns:
+        DataFrameSplit containing the train and test set, and `validation=None`.
+    """
     return DataFrameSplit(
         train=load_nasa_dataframe(nasa_subset, split_name="train", data_root=data_root),
-        test=load_nasa_dataframe(nasa_subset, split_name="test", data_root=data_root)
+        test=load_nasa_dataframe(nasa_subset, split_name="test", data_root=data_root),
     )
 
 
 def NasaDatasets_from_split(df_split: DataFrameSplit):
+    """Prepare NASA train and test datasets from ``df_split``
+
+    Args:
+        df_split (DataFrameSplit): train and test set for some NASA-compatible DataFrames
+
+    Returns:
+        Tuple[ProvidenceDataset, ProvidenceDataset]: instantiated on the train, test field of ``df_split``
+    """
     train_ds = _NasaProvidenceDataset(df_split.train)
     test_ds = _NasaProvidenceDataset(df_split.test)
 

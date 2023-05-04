@@ -5,36 +5,52 @@
 Export controlled - see license file
 """
 # COMMAND ----------
-
 # !nvidia-smi
-
 # COMMAND ----------
-
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Type
+from typing import Callable
+from typing import Type
 
 import mlflow
 import torch as pt
-from providence.dataloaders import CustomProvidenceDataloaders, ProvidenceDataLoader
-from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES, NASA_FEATURE_NAMES
+
+from providence.dataloaders import CustomProvidenceDataloaders
+from providence.dataloaders import ProvidenceDataLoader
 from providence.datasets import NasaDatasets
+from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES
+from providence.datasets.adapters import NASA_FEATURE_NAMES
 from providence.distributions import Weibull3
 from providence.loss import discrete_weibull3_loss_fn
 from providence.metrics import SDist
 from providence.nn.module import ProvidenceModule
 from providence.paper_reproductions import GeneralMetrics
-from providence.training import EpochLosses, LossAggregates, OptimizerWrapper, set_torch_default_dtypes, use_gpu_if_available, training_epoch
+from providence.training import EpochLosses
+from providence.training import LossAggregates
+from providence.training import OptimizerWrapper
+from providence.training import set_torch_default_dtypes
+from providence.training import training_epoch
+from providence.training import use_gpu_if_available
 from providence.type_utils import type_name
 from providence.types import DataLoaders
-from providence.utils import clear_memory, configure_logger_in_dir, now_dt_string, set_seed
-from providence_utils.callbacks import (
-    DeferrableEarlyStopping, EmergencyBrake, IntervalMetricsVisualizer, LearningCurveTracker, LearningRateScheduler,
-    ModelCheckpointer, WriteModelOutputs
-)
+from providence.utils import clear_memory
+from providence.utils import configure_logger_in_dir
+from providence.utils import now_dt_string
+from providence.utils import set_seed
+from providence_utils.callbacks import DeferrableEarlyStopping
+from providence_utils.callbacks import EmergencyBrake
+from providence_utils.callbacks import IntervalMetricsVisualizer
+from providence_utils.callbacks import LearningCurveTracker
+from providence_utils.callbacks import LearningRateScheduler
+from providence_utils.callbacks import ModelCheckpointer
+from providence_utils.callbacks import WriteModelOutputs
 from providence_utils.hyperparameter_sweeper import nest_keys
-from providence_utils.mlflow import create_or_set_experiment, try_log_artifacts, mlflow_training, wrap_epoch_func
-from providence_utils.trainer import EpochInterface, Trainer
+from providence_utils.mlflow import create_or_set_experiment
+from providence_utils.mlflow import mlflow_training
+from providence_utils.mlflow import try_log_artifacts
+from providence_utils.mlflow import wrap_epoch_func
+from providence_utils.trainer import EpochInterface
+from providence_utils.trainer import Trainer
 
 # COMMAND ----------
 
@@ -49,7 +65,7 @@ general_config = {
 DS_NAME_TO_FEATURE_COUNT = {
     "backblaze": len(BACKBLAZE_FEATURE_NAMES),
     "bbe": len(BACKBLAZE_FEATURE_NAMES),
-    "nasa": len(NASA_FEATURE_NAMES)
+    "nasa": len(NASA_FEATURE_NAMES),
 }
 
 # COMMAND ----------
@@ -94,8 +110,16 @@ def optimizer_default_config() -> dict:
 
 # COMMAND ----------
 def do_mlflow_run(
-    model_type: Type[ProvidenceModule], get_dls: Callable[[], DataLoaders], experiment_id: str, random_seed: int,
-    optim_config: dict, instantiation_params: dict, *, root_dir: Path, epoch_func: EpochInterface, dist_t: SDist
+    model_type: Type[ProvidenceModule],
+    get_dls: Callable[[], DataLoaders],
+    experiment_id: str,
+    random_seed: int,
+    optim_config: dict,
+    instantiation_params: dict,
+    *,
+    root_dir: Path,
+    epoch_func: EpochInterface,
+    dist_t: SDist,
 ):
     with mlflow.start_run(experiment_id=experiment_id):
         set_seed(random_seed)
@@ -118,10 +142,23 @@ def do_mlflow_run(
         logger = configure_logger_in_dir(output_dir)
         cbs = [
             LearningRateScheduler(
-                optimizer.opt, T_mult=optim_config["schedule_T_mult"], eta_min=optim_config["schedule_min"]
+                optimizer.opt,
+                T_mult=optim_config["schedule_T_mult"],
+                eta_min=optim_config["schedule_min"],
             ),
-            IntervalMetricsVisualizer(callback_config["visualization_freq"], output_dir, logger=logger, dist_t=dist_t),
-            WriteModelOutputs(callback_config["model_output_freq"], output_dir, logger=logger, verbose=False, dist_t=dist_t),
+            IntervalMetricsVisualizer(
+                callback_config["visualization_freq"],
+                output_dir,
+                logger=logger,
+                dist_t=dist_t,
+            ),
+            WriteModelOutputs(
+                callback_config["model_output_freq"],
+                output_dir,
+                logger=logger,
+                verbose=False,
+                dist_t=dist_t,
+            ),
             ModelCheckpointer(
                 output_dir=(output_dir / "model-checkpoints"),
                 track=callback_config["tracking_metric"],
@@ -135,8 +172,11 @@ def do_mlflow_run(
                 defer_until=callback_config["early_stopping.defer"],
             ),
             # our weibull loss takes a bit longer to bit below 1.0, but still begets strong results
-            EmergencyBrake(callback_config["ebrake_epoch"], callback_config["ebrake_requisite_loss"]),
-            LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve"))
+            EmergencyBrake(
+                callback_config["ebrake_epoch"],
+                callback_config["ebrake_requisite_loss"],
+            ),
+            LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve")),
         ]
         trainer = Trainer(epoch_func)
         # run_config to something we can log to mlflow
@@ -177,7 +217,9 @@ metadata_to_log["data"]["name"] = "NASA"
 # COMMAND ----------
 
 
-def global_dls(bs=general_config["batch_size"]):  # replicate what was done above. Just do it again
+def global_dls(
+    bs=general_config["batch_size"],
+):  # replicate what was done above. Just do it again
     return CustomProvidenceDataloaders(
         GLOBAL_train_ds,
         GLOBAL_val_ds,
@@ -214,11 +256,18 @@ def weibull3_training_epoch(
     optimizer: pt.optim.Optimizer,
 ) -> EpochLosses:
     losses = training_epoch(
-        dataloaders, model, optimizer, loss_criterion=discrete_weibull3_loss_fn, model_ouput_type=Weibull3.Params
+        dataloaders,
+        model,
+        optimizer,
+        loss_criterion=discrete_weibull3_loss_fn,
+        model_ouput_type=Weibull3.Params,
     )
 
     # calculate the mean loss per batch
-    averaged_losses = losses._replace(training=losses.training / len(dataloaders.train), validation=losses.validation / len(dataloaders.validation))
+    averaged_losses = losses._replace(
+        training=losses.training / len(dataloaders.train),
+        validation=losses.validation / len(dataloaders.validation),
+    )
     return averaged_losses
 
 
@@ -243,14 +292,14 @@ def reproducibility_proof__seed_check():
                     "type": pt.optim.Adam,
                     "learning_rate": 3e-4,
                     "batch_size": 8,
-                    "num_epochs": 700
+                    "num_epochs": 700,
                 },
                 instantiation_params={
-                    'input_size': DS_NAME_TO_FEATURE_COUNT["nasa"],
-                    'hidden_size': 128,
-                    'num_layers': 2,
-                    'dropout': 0.7,
-                    'activation': 'weibull3'
+                    "input_size": DS_NAME_TO_FEATURE_COUNT["nasa"],
+                    "hidden_size": 128,
+                    "num_layers": 2,
+                    "dropout": 0.7,
+                    "activation": "weibull3",
                 },
                 epoch_func=wrap_epoch_func(weibull3_training_epoch),
                 root_dir=ROOT_DIR,

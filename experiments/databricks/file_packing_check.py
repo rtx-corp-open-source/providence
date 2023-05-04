@@ -7,7 +7,6 @@ If you find a correction, please update this code and notify the team.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
 import json
 from pathlib import Path
 
@@ -20,12 +19,10 @@ DBFS_CONFIG_HOME = "/dbfs/FileStore/AIML/scratch/Providence-Attention-Axis/confi
 
 # _EXPERIMENT_1_CONFIGS = json.load(open(f"{DBFS_CONFIG_HOME}/experiment-001.json"))["configurations"]
 
-_EXPERIMENT_1_CONFIGS = (
-    list(
-        filter(
-            lambda cfg: cfg["name"].startswith('0th'),
-            json.load(open(f"{DBFS_CONFIG_HOME}/experiment-001.json"))["configurations"]
-        )
+_EXPERIMENT_1_CONFIGS = list(
+    filter(
+        lambda cfg: cfg["name"].startswith("0th"),
+        json.load(open(f"{DBFS_CONFIG_HOME}/experiment-001.json"))["configurations"],
     )
 )
 

@@ -2,10 +2,10 @@
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-from contextlib import nullcontext
-import torch
-
 import sys
+from contextlib import nullcontext
+
+import torch
 
 print("Python version", sys.version, sys.version_info)
 
@@ -38,7 +38,7 @@ with nullcontext():
 
 print("Doing forced assignment")
 with nullcontext():
-    model = get_model().to('cuda')
+    model = get_model().to("cuda")
 
     print(model)
     params = list(model.parameters())

@@ -11,28 +11,30 @@ battles, but it will speed up certain flows if we're able.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
+from time import time
 
 import horovod.torch as hvd
 import mlflow
-from providence.datasets.core import DataSubsetId, ProvidenceDataset
+import torch as pt
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim import Adam
+
+import providence.nn.transformer.deepmind as dm
+from providence.dataloaders import ProvidenceDataLoader
+from providence.datasets import BackblazeDataset
+from providence.datasets import BackblazeDatasets
+from providence.datasets.adapters import BackblazeQuarter
+from providence.datasets.core import DataSubsetId
+from providence.datasets.core import ProvidenceDataset
 from providence.datasets.nasa import NasaDataset
 from providence.distributions import Weibull
-from providence.loss import ProvidenceLossInterface, discrete_weibull_loss_fn
+from providence.loss import discrete_weibull_loss_fn
+from providence.loss import ProvidenceLossInterface
 from providence.nn.module import ProvidenceModule
-import providence.nn.transformer.deepmind as dm
-import torch as pt
-from providence.datasets import BackblazeDataset, BackblazeDatasets
-from providence.datasets.adapters import BackblazeQuarter
-from providence.dataloaders import ProvidenceDataLoader
 from providence.training import unpack_label_and_censor
-from torch.optim import Adam
-from torch.nn.utils.clip_grad import clip_grad_norm_
-
-from time import time
-
 from providence_utils.mlflow import create_or_set_experiment
 
-PYTORCH_DIR = '/dbfs/FileStore/AIML/scratch/Pytorch-Distributed/horovod_providence_pytorch'
+PYTORCH_DIR = "/dbfs/FileStore/AIML/scratch/Pytorch-Distributed/horovod_providence_pytorch"
 
 dm._DEBUG = False
 
@@ -40,21 +42,21 @@ from pathlib import Path
 
 
 def save_checkpoint(log_dir: Path, model: pt.nn.Module, optimizer: pt.optim.Optimizer, epoch: int):
-    filepath = log_dir / '/checkpoint-{epoch}.pth.tar'.format(epoch=epoch)
+    filepath = log_dir / "/checkpoint-{epoch}.pth.tar".format(epoch=epoch)
     state = {
-        'model': model.state_dict(),
-        'optimizer': optimizer.state_dict(),
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
     }
     pt.save(state, filepath)
 
 
 def load_checkpoint(log_dir, epoch):
-    filepath = log_dir + '/checkpoint-{epoch}.pth.tar'.format(epoch=epoch)
+    filepath = log_dir + "/checkpoint-{epoch}.pth.tar".format(epoch=epoch)
     return pt.load(filepath)
 
 
 def create_log_dir() -> Path:
-    log_dir = Path(PYTORCH_DIR, str(time()), 'MNISTDemo')
+    log_dir = Path(PYTORCH_DIR, str(time()), "MNISTDemo")
     log_dir.mkdir(parents=True)
     #   os.makedirs(log_dir)
     return log_dir
@@ -75,7 +77,7 @@ def testing_basics():
     print(o)
     print(o.device)
 
-    print(pt.randn(1, device='cuda'))
+    print(pt.randn(1, device="cuda"))
 
 
 def get_train_set() -> ProvidenceDataset:
@@ -84,7 +86,7 @@ def get_train_set() -> ProvidenceDataset:
         quarter=BackblazeQuarter._2019_Q4,
         train_percentage=0.7,
         consider_validation=True,
-        data_dir="/dbfs/FileStore/datasets/providence"
+        data_dir="/dbfs/FileStore/datasets/providence",
     )
 
 
@@ -99,7 +101,7 @@ def epoch_training_pass(
 ):
     train_loss = pt.zeros(1, device=model.device)
     model.train()
-    for (feats, lengths, targets) in train_dl:
+    for feats, lengths, targets in train_dl:
         optimizer.zero_grad()
 
         outputs = model(feats.to(model.device), lengths)
@@ -128,9 +130,9 @@ def train_hvd(learning_rate: float, num_epochs: int, batch_size: int, momentum: 
 
     # Initialize Horovod
     hvd.init()
-    device = pt.device('cuda' if pt.cuda.is_available() else 'cpu')
+    device = pt.device("cuda" if pt.cuda.is_available() else "cpu")
 
-    if device.type == 'cuda':
+    if device.type == "cuda":
         # Pin GPU to local rank
         pt.cuda.set_device(hvd.local_rank())
 
@@ -146,11 +148,15 @@ def train_hvd(learning_rate: float, num_epochs: int, batch_size: int, momentum: 
     # tutorial stuff...
 
     model = dm.ProvidenceBertTransformer(
-        n_heads=2, n_layers=2, n_features_in=train_ds.n_features, n_embedding=64, max_seq_len=1000
+        n_heads=2,
+        n_layers=2,
+        n_features_in=train_ds.n_features,
+        n_embedding=64,
+        max_seq_len=1000,
     )
 
     # Pin GPU to be used to process local rank (one GPU per process)
-    model.device = pt.device(f'cuda:{hvd.local_rank()}')  # get the above device?
+    model.device = pt.device(f"cuda:{hvd.local_rank()}")  # get the above device?
     print(f"{model.device = }")
     model.to(model.device)
 
@@ -181,11 +187,13 @@ for run_index in range(1, 3):
     start_time = datetime.now().isoformat()
 
     print(f"Run {run_index} started at:", start_time)
-    
+
     start_perf_time = perf_counter()
 
-    with mlflow.start_run(experiment_id=create_or_set_experiment("/Users/40000889@azg.utccgl.com/Providence on Horovod")) as ml_run:
-        run_params = { #yapf: skip
+    with mlflow.start_run(
+        experiment_id=create_or_set_experiment("/Users/40000889@azg.utccgl.com/Providence on Horovod")
+    ) as ml_run:
+        run_params = {  # yapf: skip
             "model_seed": pt.initial_seed(),
             "batch_size": 64,
             "dataset_name": "Backblaze",
@@ -202,7 +210,7 @@ for run_index in range(1, 3):
             train_hvd,
             learning_rate=run_params["optim.lr"],
             num_epochs=run_params["optim.num_epochs"],
-            batch_size=run_params["batch_size"]
+            batch_size=run_params["batch_size"],
         )
         # TODO: log evaluation metrics
 
@@ -211,5 +219,3 @@ for run_index in range(1, 3):
     end_time = datetime.now().isoformat()
     print(f"Run {run_index} ended at:", end_time)
     print(f"Performance clock says run took {end_perf_time - start_perf_time} seconds")
-
-

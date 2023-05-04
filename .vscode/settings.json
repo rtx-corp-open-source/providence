@@ -1,0 +1,6 @@
+{
+    "python.formatting.provider": "black",
+    "autoDocstring.includeExtendedSummary": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

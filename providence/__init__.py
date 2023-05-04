@@ -13,4 +13,5 @@ Please see the READMEs for more.
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-__version__ = "1.0.post1.dev7"
+
+from providence._version import __version__

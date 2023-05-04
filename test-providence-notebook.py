@@ -2,24 +2,27 @@
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-
+# flake8: noqa
 # Databricks notebook source
 # export http_proxy=http://devproxy.utc.com:80
-
 import os
-os.environ["http_proxy"] = 'http://devproxy.utc.com:80'
-os.environ["https_proxy"] = 'http://devproxy.utc.com:80'
+
+os.environ["http_proxy"] = "http://devproxy.utc.com:80"
+os.environ["https_proxy"] = "http://devproxy.utc.com:80"
 
 # COMMAND ----------
 
 import providence.datasets as ds_lib
+
 dir(ds_lib)
 
 # COMMAND ----------
 
 from providence.datasets import NasaFD00XDatasets, NasaTurbofanTest
 
-nasa_fd001_train, nasa_fd001_test = NasaFD00XDatasets(NasaTurbofanTest.FD001, data_root='/dbfs/FileStore/datasets/providence/')
+nasa_fd001_train, nasa_fd001_test = NasaFD00XDatasets(
+    NasaTurbofanTest.FD001, data_root="/dbfs/FileStore/datasets/providence/"
+)
 
 # COMMAND ----------
 
@@ -36,13 +39,28 @@ from providence.dataloaders import NasaFD00XDataLoaders, NasaDataLoaders
 from typing import List
 
 from providence_utils.callbacks import (
-    CachedIntervalMetricsVisualizer, Callback, ModelCheckpointer, WriteModelOutputs, check_before_epoch
+    CachedIntervalMetricsVisualizer,
+    Callback,
+    ModelCheckpointer,
+    WriteModelOutputs,
+    check_before_epoch,
 )
-from providence.training import DataLoaders, OptimizerWrapper, LossAggregates, training_epoch
+from providence.training import (
+    DataLoaders,
+    OptimizerWrapper,
+    LossAggregates,
+    training_epoch,
+)
 
 from progressbar import progressbar
 
-def callback_training(model, optimizer: OptimizerWrapper, dataloaders: DataLoaders, cbs: List[Callback] = None):
+
+def callback_training(
+    model,
+    optimizer: OptimizerWrapper,
+    dataloaders: DataLoaders,
+    cbs: List[Callback] = None,
+):
     """Generic training + callbacks + progressbar"""
     if cbs is None:
         cbs = []
@@ -70,9 +88,8 @@ def callback_training(model, optimizer: OptimizerWrapper, dataloaders: DataLoade
         cb.after_training(current_epoch, model, optimizer.opt, losses, dataloaders)
 
     # dataloaders.to_device('cpu')
-    model.to('cpu')
+    model.to("cpu")
     return loss_agg
-
 
 
 # COMMAND ----------
@@ -89,9 +106,18 @@ import mlflow
 
 from pathlib import Path
 
-from providence.paper_reproductions import NasaRNN, NasaTraining, NasaRnnOptimizer, compute_loss_metrics
+from providence.paper_reproductions import (
+    NasaRNN,
+    NasaTraining,
+    NasaRnnOptimizer,
+    compute_loss_metrics,
+)
 from providence.nn import ProvidenceRNN
-from providence.training import OptimizerWrapper, minimize_torch_runtime_overhead, use_gpu_if_available
+from providence.training import (
+    OptimizerWrapper,
+    minimize_torch_runtime_overhead,
+    use_gpu_if_available,
+)
 from providence.utils import configure_logger_in_dir, now_dt_string
 
 from torch import device as torch_device, initial_seed
@@ -107,28 +133,35 @@ with mlflow.start_run(experiment_id=experiment_id):
     model = model_init()
     model.device = torch_device(use_gpu_if_available())
     optimizer = NasaRnnOptimizer(model)
-    dls = NasaDataLoaders(batch_size=optimizer.batch_size, data_root='/dbfs/FileStore/datasets/providence')
+    dls = NasaDataLoaders(batch_size=optimizer.batch_size, data_root="/dbfs/FileStore/datasets/providence")
 
     mlflow.log_param("model_name", model_name)
     mlflow.log_param("seed", initial_seed())
     mlflow.log_param("optimizer", type(optimizer.opt).__name__)
 
-
     # writing directly to the dbfs directories works just fine
-    run_output_dir = Path(f'/dbfs/FileStore/manual-experiment-outputs/providence-{model_name}-NasaFull-{now_dt_string()}')
+    run_output_dir = Path(
+        f"/dbfs/FileStore/manual-experiment-outputs/providence-{model_name}-NasaFull-{now_dt_string()}"
+    )
     logger = configure_logger_in_dir(run_output_dir, logger_name="first-training-logger")
 
-
-    losses = callback_training(model, optimizer, dls, [
-        WriteModelOutputs(100, run_output_dir / "model-outputs", logger),
-        CachedIntervalMetricsVisualizer(100, run_output_dir / "visualizations", logger),
-        ModelCheckpointer(run_output_dir / "checkpoints", "val_loss", logger, keep_old=True), # fill up on models and model history
-    ])
+    losses = callback_training(
+        model,
+        optimizer,
+        dls,
+        [
+            WriteModelOutputs(100, run_output_dir / "model-outputs", logger),
+            CachedIntervalMetricsVisualizer(100, run_output_dir / "visualizations", logger),
+            ModelCheckpointer(
+                run_output_dir / "checkpoints", "val_loss", logger, keep_old=True
+            ),  # fill up on models and model history
+        ],
+    )
 
     loss_metrics = compute_loss_metrics(losses)
 
     mlflow.log_metrics(loss_metrics)
-    mlflow.log_artifacts(str(run_output_dir)) # copy everything that was generated from this run.
+    mlflow.log_artifacts(str(run_output_dir))  # copy everything that was generated from this run.
 
 
 # COMMAND ----------

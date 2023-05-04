@@ -1,0 +1,113 @@
+providence/nn/module.py:23: error: Method must have at least one argument. Did you forget the "self" argument?  [misc]
+providence/nn/module.py:29: error: Name "time" is not defined  [name-defined]
+providence/nn/module.py:29: error: Name "entity" is not defined  [name-defined]
+providence/nn/module.py:29: error: Name "features" is not defined  [name-defined]
+providence/nn/module.py:30: error: Name "entity" is not defined  [name-defined]
+providence/datasets/core.py:132: error: Incompatible types in "yield" (actual type "Tuple[str, Tuple[Any, ...]]", expected type "Tuple[str, Tuple[Any, Any]]")  [misc]
+providence/nn/weibull.py:61: error: The return type of "__init__" must be None  [misc]
+providence/nn/weibull.py:61: error: Missing return statement  [return]
+providence/nn/weibull.py:91: error: The return type of "__init__" must be None  [misc]
+providence/nn/weibull.py:91: error: Missing return statement  [return]
+providence/nn/weibull.py:118: error: The return type of "__init__" must be None  [misc]
+providence/nn/weibull.py:118: error: Missing return statement  [return]
+providence/nn/rnn.py:45: error: Name "length_per_sequence" is not defined  [name-defined]
+providence/nn/rnn.py:96: error: Variable "providence.nn.rnn.ProvidenceTensor" is not valid as a type  [valid-type]
+providence/nn/rnn.py:96: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+providence/nn/rnn.py:112: error: Name "timestep" is not defined  [name-defined]
+providence/nn/rnn.py:112: error: Name "batch" is not defined  [name-defined]
+providence/nn/rnn.py:112: error: Name "feature" is not defined  [name-defined]
+providence/nn/adaptive.py:56: error: Name "time" is not defined  [name-defined]
+providence/nn/adaptive.py:56: error: Name "device" is not defined  [name-defined]
+providence/nn/adaptive.py:56: error: Name "features" is not defined  [name-defined]
+providence/nn/adaptive.py:57: error: Name "device" is not defined  [name-defined]
+providence/nn/adaptive.py:59: error: "ProvidenceModule" not callable  [operator]
+providence/nn/transformer/deepmind.py:77: error: Name "context_dim" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:77: error: Name "feature_dim" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:126: error: Name "n_context_in" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:126: error: Name "n_features_in" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:167: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:168: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:296: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:297: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:372: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:372: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:372: error: Name "embedding" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:472: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:472: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:472: error: Name "embedding" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:473: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:473: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:473: error: Name "embedding" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:474: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:474: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:474: error: Name "embedding" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:541: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:541: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:541: error: Name "embedding" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:629: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:629: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:629: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:630: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:630: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:630: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:631: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:632: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:633: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:633: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:633: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:730: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:730: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:730: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:731: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:731: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:731: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:809: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:809: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:809: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:810: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:810: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:866: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:866: error: Name "batch" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:866: error: Name "features" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:867: error: Name "time" is not defined  [name-defined]
+providence/nn/transformer/deepmind.py:867: error: Name "batch" is not defined  [name-defined]
+providence/utils.py:130: error: Cannot use a covariant type variable as a parameter  [misc]
+providence/utils.py:172: error: Argument "key" to "sort" of "list" has incompatible type "itemgetter[str]"; expected "Callable[[T_co], Union[SupportsDunderLT[Any], SupportsDunderGT[Any]]]"  [arg-type]
+providence/utils.py:172: note: "itemgetter[str].__call__" has type "Callable[[Arg(SupportsGetItem[Any, Any], 'obj')], Any]"
+providence/utils.py:284: error: Name "nn" is not defined  [name-defined]
+providence/utils.py:284: error: Name "torch" is not defined  [name-defined]
+providence/distributions.py:123: error: Argument 1 of "cumulative_hazard" is incompatible with supertype "_SurvivalAnalysisDistribution"; supertype defines the argument type as "Tuple[Any, ...]"  [override]
+providence/distributions.py:123: note: This violates the Liskov substitution principle
+providence/distributions.py:123: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+providence/distributions.py:127: error: Signature of "loglikelihood_discrete" incompatible with supertype "_SurvivalAnalysisDistribution"  [override]
+providence/distributions.py:127: note:      Superclass:
+providence/distributions.py:127: note:          @classmethod
+providence/distributions.py:127: note:          def loglikelihood_discrete(cls, params: Tuple[Any, ...], t: Any, censor: Any) -> Any
+providence/distributions.py:127: note:      Subclass:
+providence/distributions.py:127: note:          @classmethod
+providence/distributions.py:127: note:          def loglikelihood_discrete(cls, params: Params, t: Any, censor: Any, epsilon: float = ..., clamp_min: float = ..., clamp_max: float = ...) -> Any
+providence/distributions.py:149: error: Signature of "loglikelihood_continuous" incompatible with supertype "_SurvivalAnalysisDistribution"  [override]
+providence/distributions.py:149: note:      Superclass:
+providence/distributions.py:149: note:          @classmethod
+providence/distributions.py:149: note:          def loglikelihood_continuous(cls, params: Tuple[Any, ...], t: Any, censor: Any) -> Any
+providence/distributions.py:149: note:      Subclass:
+providence/distributions.py:149: note:          @classmethod
+providence/distributions.py:149: note:          def loglikelihood_continuous(cls, params: Params, t: Any, censor: Any, epsilon: float = ...) -> Any
+providence/distributions.py:158: error: Argument 1 of "mean" is incompatible with supertype "_SurvivalAnalysisDistribution"; supertype defines the argument type as "Tuple[Any, ...]"  [override]
+providence/distributions.py:158: note: This violates the Liskov substitution principle
+providence/distributions.py:158: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+providence/distributions.py:163: error: Argument 1 of "median" is incompatible with supertype "_SurvivalAnalysisDistribution"; supertype defines the argument type as "Tuple[Any, ...]"  [override]
+providence/distributions.py:163: note: This violates the Liskov substitution principle
+providence/distributions.py:163: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+providence/distributions.py:168: error: Argument 1 of "mode" is incompatible with supertype "_SurvivalAnalysisDistribution"; supertype defines the argument type as "Tuple[Any, ...]"  [override]
+providence/distributions.py:168: note: This violates the Liskov substitution principle
+providence/distributions.py:168: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+providence/distributions.py:175: error: Argument 1 of "pdf" is incompatible with supertype "_SurvivalAnalysisDistribution"; supertype defines the argument type as "Tuple[Any, ...]"  [override]
+providence/distributions.py:175: note: This violates the Liskov substitution principle
+providence/distributions.py:175: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+providence/distributions.py:217: note: (Skipping most remaining errors due to unresolved imports or missing stubs; fix these first)
+providence/datasets/adapters.py:26: error: Library stubs not installed for "requests"  [import]
+providence/datasets/adapters.py:26: note: Hint: "python3 -m pip install types-requests"
+providence/datasets/adapters.py:26: note: (or run "mypy --install-types" to install all missing stub packages)
+providence/datasets/adapters.py:26: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+Found 84 errors in 9 files (checked 30 source files)

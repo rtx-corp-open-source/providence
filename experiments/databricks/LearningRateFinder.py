@@ -7,28 +7,34 @@ Runs an improved Learning Rate Finder on databricks
 Export controlled - see license file
 """
 # COMMAND ----------
-
 from pathlib import Path
-from typing import Callable, Dict, Union
+from typing import Callable
+from typing import Dict
+from typing import Union
 
 import torch
+
 from providence.dataloaders import ProvidenceDataLoader
-from providence.datasets.adapters import (BACKBLAZE_FEATURE_NAMES, NASA_FEATURE_NAMES)
 from providence.datasets import NasaDatasets
-from providence.training import set_torch_default_dtypes, use_gpu_if_available
-from providence.utils import now_dt_string, set_seed
+from providence.datasets.adapters import BACKBLAZE_FEATURE_NAMES
+from providence.datasets.adapters import NASA_FEATURE_NAMES
+from providence.training import set_torch_default_dtypes
+from providence.training import use_gpu_if_available
 from providence.type_utils import type_name
+from providence.utils import now_dt_string
+from providence.utils import set_seed
 
 # COMMAND ----------
 
 DS_NAME_TO_FEATURE_COUNT = {
     "backblaze": len(BACKBLAZE_FEATURE_NAMES),
     "bbe": len(BACKBLAZE_FEATURE_NAMES),
-    "nasa": len(NASA_FEATURE_NAMES)
+    "nasa": len(NASA_FEATURE_NAMES),
 }
 
 # COMMAND ----------
 import providence.nn.transformer.deepmind as dm
+
 dm._DEBUG = False
 
 # COMMAND ----------
@@ -67,7 +73,7 @@ from providence.distributions import Weibull
 from providence.training import unpack_label_and_censor
 from matplotlib import pyplot as plt
 
-from tqdm import tqdm # comes in with the Databricks environment
+from tqdm import tqdm  # comes in with the Databricks environment
 from torch import nn, optim
 from torch.utils.data import DataLoader, dataset
 
@@ -81,7 +87,7 @@ class ProvidenceLearningRateFinder:
         train_dataloader: DataLoader,
         model_name: str = None,
         *,
-        verbose: bool = False
+        verbose: bool = False,
     ):
         self.net_factory = net_factory
         self.opt_factory = opt_factory
@@ -132,7 +138,7 @@ class ProvidenceLearningRateFinder:
             avg_loss = learning_beta * avg_loss + ((1 - learning_beta) * loss.item())
             self.log(f"{avg_loss = }")
 
-            smoothed_loss = avg_loss / (1 - learning_beta ** batch_num)
+            smoothed_loss = avg_loss / (1 - learning_beta**batch_num)
             self.log(f"{smoothed_loss = }")
             should_exit = torch.isnan(loss) or torch.isnan(torch.tensor(smoothed_loss))
 
@@ -151,7 +157,7 @@ class ProvidenceLearningRateFinder:
             # Update the lr for the next step
             lr *= mult
             optimizer.param_groups[0]["lr"] = lr
-        net.to('cpu')
+        net.to("cpu")
         return log_lrs, losses
 
     def find_and_plot_lr(self, output_dir: Path, init_value=1e-8, final_value=10.0, beta=0.98):
@@ -166,8 +172,8 @@ class ProvidenceLearningRateFinder:
         fig.savefig(fig_output_path)
         print("Saved found plot to", fig_output_path)
 
-# COMMAND ----------
 
+# COMMAND ----------
 
 
 # COMMAND ----------
@@ -179,9 +185,17 @@ import providence.loss as prov_loss
 # bs = 64, hidden = 256
 # bs = 128, hidden = 512 both seem to work well.
 # n_layers = 4 is genuinely more stable
+from typing import TypedDict
 
-def run_lr_finder(dir_for_pictures: str, hyperparameters: Dict[str, Union[int, float]]):
+class LR_Hyperparams(TypedDict):
+    cycles: int
+    bs: int
+    hidden_size: int
+    n_layers: int
+    dropout: float
 
+
+def run_lr_finder(dir_for_pictures: str, hyperparameters: LR_Hyperparams):
     train_data, _ = NasaDatasets(data_root="/dbfs/FileStore/datasets/providence")
 
     print(f"{len(train_data) = }")
@@ -236,8 +250,6 @@ def run_lr_finder(dir_for_pictures: str, hyperparameters: Dict[str, Union[int, f
     output_dir = Path(dir_for_pictures, "lr-finder")
     output_dir.mkdir(parents=True, exist_ok=True)
     lr_finder.find_and_plot_lr(output_dir)
-    
-
 
 
 # COMMAND ----------
@@ -249,6 +261,12 @@ def run_lr_finder(dir_for_pictures: str, hyperparameters: Dict[str, Union[int, f
 
 run_lr_finder(
     dir_for_pictures=ROOT_DIR,
-    hyperparameters = {"bs": 2, "hidden_size": 256, "n_layers": 1, "n_attention_heads": 2, "dropout": 0.0, "cycles": 3,}
+    hyperparameters={
+        "bs": 2,
+        "hidden_size": 256,
+        "n_layers": 1,
+        "n_attention_heads": 2,
+        "dropout": 0.0,
+        "cycles": 3,
+    },
 )
-
