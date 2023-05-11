@@ -44,18 +44,32 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from jaxtyping import Bool, Float, Int
+from jaxtyping import Bool
+from jaxtyping import Float
 import torch as pt
 from torch.nn import Dropout
 from torch.nn import functional as F
 from torch.nn import LayerNorm
 from torch.nn import Linear
 from torch.nn import ModuleList
+from typeguard import typechecked
 
 from providence.nn.rnn import get_activation
-from providence.types import LengthsTensor, ProvidenceTensor
+from providence.types import LengthsTensor
+from providence.types import ProvidenceTensor
 from providence_utils.fastai_torch_core import Module
 from providence_utils.fastai_utils import delegates
+
+batch_time_embedding = "batch time embedding"
+batch_time_features = "batch time features"
+time_batch_1 = "... time batch 1"
+time_embedding = "... time embedding"
+time_n_context_in = "... time n_context_in"
+time_n_features = "... time n_features"
+time_value_dim = "... time value_dim"
+context_dim_feature_dim = "context_dim feature_dim"
+n_context_in_n_features_in = "n_context_in n_features_in"
+_batch_time_1 = "*batch time 1"
 
 
 class MaskMode(enum.Enum):
@@ -72,7 +86,7 @@ class MaskMode(enum.Enum):
     cross_attention = unmasked
 
 
-def _init_mask(feature_dim: int, context_dim: int, mode: MaskMode) -> Bool[pt.Tensor, "context_dim feature_dim"]:
+def _init_mask(feature_dim: int, context_dim: int, mode: MaskMode) -> Bool[pt.Tensor, context_dim_feature_dim]:
     mask = pt.ones((context_dim, feature_dim))
     if mode == MaskMode.unmasked:  # or bi-directional attention
         return mask
@@ -135,7 +149,7 @@ class AttentionHead(Module):
         n_context_in: int,
         att_out_dim: int,
         mask: Union[  # type: ignore[name-defined]
-            MaskMode, Bool[pt.Tensor, "n_context_in n_features_in"]
+            MaskMode, Bool[pt.Tensor, n_context_in_n_features_in]
         ],  # NOTE(stephen): I don't think you can pass in a single mask at this level.
         *,
         inner_att_dim: int = 32,
@@ -164,9 +178,9 @@ class AttentionHead(Module):
 
     def forward(
         self,
-        X: Float[pt.Tensor, "... time n_features"],
-        Z: Float[pt.Tensor, "... time n_context_in"],
-    ) -> Float[pt.Tensor, "... time value_dim"]:
+        X: Float[pt.Tensor, time_n_features],
+        Z: Float[pt.Tensor, time_n_context_in],
+    ) -> Float[pt.Tensor, time_value_dim]:
         """Apply single-head attention in a batched fashion.
 
         Internally we transpose to make the temporal dimension the axis of attention, leaning heavily into the
@@ -296,9 +310,9 @@ class MHAttention(Module):
 
     def forward(
         self,
-        X: Float[pt.Tensor, "... time n_features"],
-        Z: Float[pt.Tensor, "... time n_context_in"],
-    ) -> Float[pt.Tensor, "... time value_dim"]:
+        X: Float[pt.Tensor, time_n_features],
+        Z: Float[pt.Tensor, time_n_context_in],
+    ) -> Float[pt.Tensor, time_value_dim]:
         """Perform multi-head attention pass on input ``X`` and context ``Z``.
 
         Args:
@@ -377,7 +391,8 @@ class CausalSelfAttention(Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
 
-    def forward(self, x: Float[pt.Tensor, "batch time embedding"]) -> Float[pt.Tensor, "batch time embedding"]:
+    @typechecked
+    def forward(self, x: Float[pt.Tensor, batch_time_embedding]) -> Float[pt.Tensor, batch_time_embedding]:
         """Apply causal self-attention on input ``x``.
 
         Args:
@@ -498,9 +513,9 @@ class Decoder(Module):
 
     def forward(
         self,
-        X: Float[pt.Tensor, "batch time embedding"],
-        Z: Float[pt.Tensor, "batch time embedding"],
-    ) -> Float[pt.Tensor, "batch time embedding"]:
+        X: Float[pt.Tensor, batch_time_embedding],
+        Z: Float[pt.Tensor, batch_time_embedding],
+    ) -> Float[pt.Tensor, batch_time_embedding]:
         """Perform the decoding forward pass as explained in Algorithm 8 of the paper.
 
         Args:
@@ -588,7 +603,8 @@ class Encoder(Module):
         self.inner_mlp = Linear(pseudo_embedding_dim, self.ff_dim)
         self.outer_mlp = Linear(self.ff_dim, pseudo_embedding_dim)
 
-    def forward(self, X: Float[pt.Tensor, "... time embedding"]) -> Float[pt.Tensor, "... time embedding"]:
+    @typechecked
+    def forward(self, X: Float[pt.Tensor, time_embedding]) -> Float[pt.Tensor, time_embedding]:
         """Perform encoding forwmard pass per algorithm 9 of the paper.
 
         Args:
@@ -700,11 +716,11 @@ class EDTransformer(Module):
 
     def forward(
         self,
-        X: Float[pt.Tensor, "batch time features"],
-        Z: Float[pt.Tensor, "batch time features"],
+        X: Float[pt.Tensor, batch_time_features],
+        Z: Float[pt.Tensor, batch_time_features],
         X_lengths: LengthsTensor,
         Z_lengths: LengthsTensor,
-    ) -> Float[pt.Tensor, "batch time features"]:
+    ) -> Float[pt.Tensor, batch_time_features]:
         """Encoder-Decoder transformer inference, using ``lengths`` to select out the positional encoding
 
         Args:
@@ -818,8 +834,8 @@ class ETransformer(Module):
         )
 
     def forward(
-        self, X: Float[pt.Tensor, "*batch time features"], lengths: LengthsTensor
-    ) -> Float[pt.Tensor, "*batch time 1"]:
+        self, X: Float[pt.Tensor, batch_time_features], lengths: LengthsTensor
+    ) -> Float[pt.Tensor, _batch_time_1]:
         """Encoder-only transformer inference, using ``lengths`` to select out the positional encoding.
 
         Follows Algorithm 9 from the paper
@@ -926,7 +942,7 @@ class ProvidenceBertTransformer(Module):
         )
         self.activation = get_activation(self.dist_name)
 
-    def forward(self, X: ProvidenceTensor, lengths: LengthsTensor) -> Tuple[Float[pt.Tensor, "... time batch 1"], ...]:
+    def forward(self, X: ProvidenceTensor, lengths: LengthsTensor) -> Tuple[Float[pt.Tensor, time_batch_1], ...]:
         """Perform the full forward pass of Algorithm 9., extended to support Providence's inference paradigm.
 
         Args:
@@ -1010,7 +1026,7 @@ class ProvidenceDeepMindTransformer(Module):
         )
         self.activation = get_activation(self.dist_name)
 
-    def forward(self, X: ProvidenceTensor, lengths: LengthsTensor) -> Tuple[Float[pt.Tensor, "... time batch 1"], ...]:
+    def forward(self, X: ProvidenceTensor, lengths: LengthsTensor) -> Tuple[Float[pt.Tensor, time_batch_1], ...]:
         """Perform the full forward pass of Algorithm 8, extended to support Providence's inference paradigm.
 
         Args:

@@ -6,8 +6,7 @@ make individual investigation easy
 Export controlled - see license file
 """
 from logging import getLogger
-from typing import Any, Iterable, Type
-from typing import Iterator
+from typing import Iterable
 from typing import List
 from typing import NamedTuple
 from typing import Optional

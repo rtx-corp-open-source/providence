@@ -135,7 +135,7 @@ class ProvidenceRNN(Module):
         self.rnn.reset_parameters()  # for RNNBase, Modules uses standard normalization
         self.activation.reset_parameters()
 
-    def forward(self, x: ProvidenceTensor, x_lengths: _ProvidenceLengths) -> Tuple[ProvidenceTensor, ...]:
+    def forward(self, x: ProvidenceTensor, x_lengths: _ProvidenceLengths) -> Tuple[ProvidenceTensor, ...]:  # type: ignore[valid-type]
         """Perform RNN forward pass.
 
         Args:

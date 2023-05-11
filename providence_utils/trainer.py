@@ -5,10 +5,12 @@ Trainer abstraction to make it easier to do model training (especially with our 
 Export controlled - see license file
 """
 from abc import abstractmethod
-from typing import Generic, List, Tuple
+from typing import Generic
+from typing import List
 from typing import NamedTuple
 from typing import Optional
 from typing import Protocol
+from typing import Tuple
 
 import torch as pt
 from click import progressbar
@@ -17,7 +19,7 @@ from torch import zeros
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim import Optimizer
 
-from providence.distributions import SurvivalAnalysisDistribution, T_DistributionParams
+from providence.distributions import T_DistributionParams
 from providence.distributions import Weibull
 from providence.loss import discrete_weibull_loss_fn
 from providence.loss import ProvidenceLossInterface

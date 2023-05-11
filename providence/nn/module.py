@@ -9,9 +9,12 @@ If you already have a model that should work with our code, but are having diffi
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any
 from typing import Iterator
+from typing import Protocol
+from typing import runtime_checkable
 from typing import Tuple
+from typing import TypeVar
 
 from torch import device
 from torch import Tensor

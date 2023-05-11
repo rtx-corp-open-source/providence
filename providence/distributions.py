@@ -10,8 +10,10 @@ Export controlled - see license file
 """
 from abc import ABC
 from abc import abstractmethod
-from typing import Generic, List, Protocol, TypeVar
+from typing import Generic
+from typing import List
 from typing import NamedTuple
+from typing import TypeVar
 
 import torch as pt
 from torch import BoolTensor

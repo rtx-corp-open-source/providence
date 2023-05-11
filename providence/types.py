@@ -75,4 +75,4 @@ class DataLoaders(NamedTuple):
 
 LengthsTensor = Int[pt.Tensor, "entity+0"]
 TimeTensor = Int[pt.Tensor, "time+0"]
-ProvidenceTensor: TypeAlias = Float[pt.Tensor, "*batch time entity feature"]
+ProvidenceTensor: TypeAlias = Float[pt.Tensor, "*batch time entity feature"]  # noqa: F722

@@ -26,6 +26,7 @@ from providence.nn.module import ProvidenceModule
 from providence.types import DataLoaders
 
 
+time_device_2 = "time device 2"
 ProvidenceLossInterfaceType = Union[ProvidenceLossInterface, Callable]
 
 
@@ -103,7 +104,7 @@ class OptimizerWrapper(NamedTuple):
     num_epochs: int
 
 
-def unpack_label_and_censor(targets: Float[pt.Tensor, "time device 2"]):
+def unpack_label_and_censor(targets: Float[pt.Tensor, time_device_2]):
     """Separate and flatten the true ``tte`` and ``censor`` columns.
 
     This function may be replaced by torch.(Tensor.)split in a later version.

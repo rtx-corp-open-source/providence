@@ -60,7 +60,7 @@ Implementation is
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-from typing import Literal
+from typing import Literal  # noqa: F401
 from typing import Tuple
 
 from pandas import concat as concat_dataframes

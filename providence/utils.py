@@ -11,8 +11,8 @@ from crypt import mksalt
 from logging import getLogger
 from operator import itemgetter
 from pathlib import Path
-from typing import Any
-from typing import Callable
+from typing import Any  # noqa: F401
+from typing import Callable  # noqa: F401
 from typing import Iterable
 from typing import List
 from typing import Optional
@@ -48,7 +48,7 @@ def cached_dataframe(operation: Callable[[], DataFrame], path: Union[str, Path])
     path = Path(path)
     suffix = path.suffix[1:]  # all suffixes are preceded by '.' i.e. Path('foo.csv').suffix == '.csv'
     if path.is_file():
-        read_func = read_csv if suffix == "csv" else read_feather  # type: function
+        read_func = read_csv if suffix == "csv" else read_feather  # type: function  # noqa: F821
         logger.info(f"Found cached dataframe at {path}")
         return read_func(path)  # type: ignore[operator]
     elif suffix in {"csv", "feather"}:

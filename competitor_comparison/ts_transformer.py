@@ -37,7 +37,7 @@ def model_factory(config, data):
 
     if (task == "imputation") or (task == "transduction"):
         if config["model"] == "LINEAR":
-            return DummyTSTransformerEncoder(
+            return DummyTSTransformerEncoder(  # noqa: F821
                 feat_dim,
                 max_seq_len,
                 config["d_model"],
@@ -70,7 +70,7 @@ def model_factory(config, data):
             len(data.class_names) if task == "classification" else data.labels_df.shape[1]
         )  # dimensionality of labels
         if config["model"] == "LINEAR":
-            return DummyTSTransformerEncoderClassiregressor(
+            return DummyTSTransformerEncoderClassiregressor(  # noqa: F821
                 feat_dim,
                 max_seq_len,
                 config["d_model"],

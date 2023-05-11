@@ -5,8 +5,8 @@ Normalization, (opinionated) train-val-test splitting, and more wil be available
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
-from typing import Any
-from typing import Callable
+from typing import Any  # noqa: F401
+from typing import Callable  # noqa: F401
 from typing import List
 from typing import Tuple
 from typing import Union

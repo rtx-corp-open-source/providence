@@ -13,12 +13,14 @@ from torch import nn
 from torch import Tensor
 from torch.nn import Module
 
+from .vendored_memory_effecient_attention import efficient_dot_product_attention
 from providence.types import ProvidenceTensor
 
-from .vendored_memory_effecient_attention import efficient_dot_product_attention
+
+n_context_n_feature = "n_context n_feature"
 
 
-def _init_causal_mask(feature_dim: int, context_dim: int) -> Bool[pt.Tensor, "n_context n_feature"]:
+def _init_causal_mask(feature_dim: int, context_dim: int) -> Bool[pt.Tensor, n_context_n_feature]:
     mask = pt.ones((context_dim, feature_dim))
     return pt.tril(mask).to(pt.bool)
 

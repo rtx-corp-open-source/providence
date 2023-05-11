@@ -6,15 +6,18 @@ This is most notable in `with_weibull(...)`
 Export controlled - see license file
 """
 from typing import Tuple
+
 from jaxtyping import Float
+from providence.types import LengthsTensor
 from torch import Tensor
 from torch.nn import Module
-
-from providence.types import LengthsTensor
 
 from ..type_utils import patch
 from .module import ProvidenceModule
 from .weibull import WeibullHead
+
+time_entity_features = "... time entity features"
+time_entity_1 = "... time entity 1"
 
 
 @patch(cls_method=True)
@@ -75,8 +78,8 @@ class WeibullWrapper(Module):
         self.weibull.reset_parameters()
 
     def forward(
-        self, x: Float[Tensor, "... time entity features"], x_lengths: LengthsTensor
-    ) -> Tuple[Float[Tensor, "... time entity 1"], ...]:
+        self, x: Float[Tensor, time_entity_features], x_lengths: LengthsTensor
+    ) -> Tuple[Float[Tensor, time_entity_1], ...]:
         """Perform the standard Providence forward pass.
 
         Args:

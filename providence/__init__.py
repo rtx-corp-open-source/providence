@@ -14,4 +14,4 @@ Please see the READMEs for more.
 Export controlled - see license file
 """
 
-from providence._version import __version__
+from providence._version import __version__ # noqa F401

@@ -13,6 +13,10 @@ from torch.nn import LazyLinear
 from torch.nn import Module
 
 
+time_entity_features = "time entity features"
+entity_probabilities = "entity probabilities"
+
+
 class ClassificationHead(Module):
     """EXPERIMENTAL: Unused classification head for a module.
 
@@ -29,6 +33,6 @@ class ClassificationHead(Module):
         self.n_classes = n_classes
         self.inner = LazyLinear(self.n_classes)
 
-    def forward(self, examples: Float[Tensor, "time entity features"]) -> Float[Tensor, "entity probabilities"]:
+    def forward(self, examples: Float[Tensor, time_entity_features]) -> Float[Tensor, entity_probabilities]:
         mapped = self.inner(einsum("...ef -> ef", examples))
         return F.softmax(mapped, dim=-1)

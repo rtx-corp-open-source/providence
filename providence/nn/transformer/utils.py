@@ -10,7 +10,10 @@ from jaxtyping import Bool
 import torch as pt
 
 
-def make_bit_masking_tensor(lengths: List[int], mask_offset=0) -> Bool[pt.Tensor, "max_sequence_length entities"]:
+max_sequence_length_entities = "max_sequence_length entities"
+
+
+def make_bit_masking_tensor(lengths: List[int], mask_offset=0) -> Bool[pt.Tensor, max_sequence_length_entities]:
     """Mask multiplicative, which will directly mask-out values which aren't actually part of the sequence.
 
     This is just the sequence-length mask i.e. how to avoid inference on the NaNs or junk memory that is contained

@@ -20,7 +20,19 @@ coverage
 Sphinx
 sphinx_rtd_theme
 pytest_cov
+sphinx-gherkindoc
+dx-rotor-sphinx
+sphinx-icontract
+sphinx-gallery
 
 
 # training new models
 seaborn
+
+typeguard==2.13.3
+
+# Documentation building
+myst-parser
+ipykernel
+nbsphinx
+

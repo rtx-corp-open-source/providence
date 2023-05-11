@@ -1,9 +1,6 @@
 from typing import Protocol
 
 
-from typing import Protocol
-
-
 class FType(Protocol):
     def __call__(self, a: int) -> float:
         ...

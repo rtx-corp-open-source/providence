@@ -1,5 +1,6 @@
 # syntax = docker/dockerfile:latest
-
+# **Raytheon Technologies proprietary**
+# Export controlled - see license file
 FROM registry.access.redhat.com/ubi8/ubi-init
 
 ARG HTTP_PROXY
