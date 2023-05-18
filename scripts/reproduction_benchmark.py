@@ -1,11 +1,8 @@
 """
 This script captures the key-value correspondence between a reference model and their best case performance
 given all of the parameters we have available to configure the space.
-<<<<<<< HEAD
-=======
 If you follow this file, you should get *better* results than were published in Providence
 (work avaiable to read at https://ieeexplore.ieee.org/document/9843469 or by DOI: 10.1109/AERO53065.2022.9843469)
->>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
 
 Include everything for the best performance on the NASA FD00X subsets
 -   Hyperparameters
@@ -351,36 +348,113 @@ NASA_Aggregate_LSTM.best_metrics = pd.DataFrame(
     }
 )  # yapf: disable
 
-# TODO: fill in from the Confluence page (https://confluence.utc.com/display/NAPD/Providence+Reproducibility)
+def _backblaze_dls_func(data_root_path: str):
+    train_ds, val_ds = NasaDatasets(data_root=data_root_path)
+    test_ds = val_ds
+
+    def fresh_dls(bs: int):  # replicate what was done above. Just do it again
+        return CustomProvidenceDataloaders(
+            train_ds,
+            val_ds,
+            batch_size=bs,
+            num_workers=1,
+            pin_memory=True,
+        )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1, num_workers=1))
+
+    return fresh_dls
 
 
-def Backblaze_VanillaRNN():
-<<<<<<< HEAD
-=======
-    # TODO(stephen): WIP. Finish all of these
-    ProvidenceVanillaRNN
-    dict(**optimizer_default_config(), # defaults first
-        batch_size=1, learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam)
-    dict(input_size=feature_counts["backblaze"], hidden_size=128, num_layers=2, dropout=0.6)
->>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
-    ...
+def Backblaze_VanillaRNN(data_root_path: str, outputs_root: str):
+    opt_params = dict(
+        **optimizer_default_config(),
+        batch_size=1,
+        learning_rate=3e-3,
+        num_epochs=700,
+        schedule_T_mult=2,
+        schedule_min=1e-5,
+        type=pt.optim.Adam
+    )
+    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=128, num_layers=2, dropout=0.6)
+    seed = 15620825294243023828
+
+    model, metrics = do_model_run(
+        ProvidenceVanillaRNN,
+        _backblaze_dls_func(data_root_path),
+        random_seed=seed,
+        optim_params=opt_params,
+        model_params=model_params,
+        callback_config=callback_default_config(),
+        outputs_root_dir=outputs_root,
+        epoch_definition=training_epoch
+    )
+    return model, metrics
 
 
-Backblaze_VanillaRNN.best_metrics = pd.DataFrame(...)
+Backblaze_VanillaRNN.best_metrics = pd.DataFrame({
+    "MSE": [795.1],
+    "MFE": [0.969],
+    "SMAPE": [0.328],
+    "SMPE": [0.094],
+})
 
 
-def Backblaze_LSTM():
-    ...
+def Backblaze_LSTM(data_root_path: str, outputs_root: str):
+    
+    opt_params = dict(**optimizer_default_config(),
+        batch_size=8,learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam
+    )
+    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, dropout=0.75, num_layers=3)
+    seed = 11068621650300516211
+
+    model, metrics = do_model_run(
+        ProvidenceLSTM,
+        _backblaze_dls_func(data_root_path),
+        seed,
+        opt_params,
+        model_params,
+        callback_default_config(),
+        outputs_root,
+        training_epoch
+    )
+
+    return model, metrics
+
+# paper: MSE 1113.22, MFE 22.36, SMAPE 0.43, SMPE -0.27
+Backblaze_LSTM.best_metrics = pd.DataFrame({
+    "MSE": [788.1],
+    "MFE": [1.68],
+    "SMAPE": [0.332],
+    "SMPE": [0.07]
+})
 
 
-Backblaze_LSTM.best_metrics = pd.DataFrame(...)
+def Backblaze_GRU(data_root_path: str, outputs_root: str):
+    opt_params = dict(batch_size=64, learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam)
+    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=1024, dropout=0.3, num_layers=2)
+    seed = 11068621650300516211
 
+    model, metrics = do_model_run(
+        ProvidenceLSTM,
+        _backblaze_dls_func(data_root_path),
+        seed,
+        opt_params,
+        model_params,
+        callback_default_config(),
+        outputs_root,
+        training_epoch
+    )
 
-def Backblaze_GRU():
-    ...
+    return model, metrics
 
-
-Backblaze_GRU.best_metrics = pd.DataFrame(...)
+# paper: MSE 834.77, MFE 17.46, SMAPE 0.38, SMPE -0.18
+Backblaze_GRU.best_metrics = pd.DataFrame(
+    {
+        "MFE": [-0.154],
+        "MSE": [678.2],
+        "SMAPE": [0.309],
+        "SMPE": [0.093],
+    }
+)
 
 
 def BackblazeExtended_VanillaRNN():
