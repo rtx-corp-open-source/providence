@@ -301,7 +301,7 @@ def main(
     ),
 ) -> None:
     experiment_id = create_or_set_experiment(
-        "/Users/40000889@azg.utccgl.com/Providence-Investigative-Research/Attention Axis Re-evaluation"
+        "/Users/{UserNameHere}/Providence-Investigative-Research/Attention Axis Re-evaluation"
     )
     for _ in range(10):
         mlflow.end_run("KILLED")  # make sure there's nothing else running

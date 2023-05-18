@@ -45,7 +45,7 @@ dm._DEBUG = False
 # COMMAND ----------
 # from providence_utils.mlflow import create_or_set_experiment, try_log_artifacts
 
-# EXPERIMENT_NAME = "/Users/40000889@azg.utccgl.com/Providence-Investigative-Research/DeepMind Transformer Performance"
+# EXPERIMENT_NAME = "/Users/{UserNameHere}/Providence-Investigative-Research/DeepMind Transformer Performance"
 
 # EXPERIMENT_ID = create_or_set_experiment(EXPERIMENT_NAME)
 

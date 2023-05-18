@@ -279,7 +279,7 @@ def main():
     print(f"Run {run_index} started at:", start_time)
 
     with mlflow.start_run(
-        experiment_id=create_or_set_experiment("/Users/40000889@azg.utccgl.com/TEST Providence Weibull-3")
+        experiment_id=create_or_set_experiment("/Users/{UserNameHere}/TEST Providence Weibull-3")
     ) as ml_run:
         start_perf_time = perf_counter()
         run_params = {  # yapf: skip

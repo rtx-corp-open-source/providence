@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2023-05-16
 ### Changed
 - Implemented `mypy` static type checking and flake8 , initial run of black.
 - Setup pre-commit.
@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.pre-commit-config.yaml`
 - `pyproject.toml`
 - `mypy.ini`
+
+### Notes
+Additional fixes to produce the internal Jenkins pipeline
 
 ## [1.0.post1.dev7] - 2023-01-23
 ### Added

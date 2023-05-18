@@ -237,7 +237,7 @@ def global_dls(
 
 # COMMAND ----------
 
-EXPERIMENT_NAME = "/Users/40000889@azg.utccgl.com/Providence-Investigative-Research/NASA Transformer (Hybrid, Redux)"
+EXPERIMENT_NAME = "/Users/{UserNameHere}/Providence-Investigative-Research/NASA Transformer (Hybrid, Redux)"
 
 EXPERIMENT_ID = create_or_set_experiment(EXPERIMENT_NAME)
 

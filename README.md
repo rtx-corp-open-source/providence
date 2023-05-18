@@ -15,13 +15,15 @@ For more general and abstract reading, Michael Betancourt covers the foundations
 
 ## Installation
 
-TODO: with Luke
+Requires: Python 3.8+, PyTorch 1.8.0+
+
+Clone this repository and perform a local installation via `pip`.
 
 ```sh
-pip install rtx-edx-providence
+> git clone https://github.com/rtx-corp-open-source/providence/
+...
+> pip install -e providence/
 ```
-
-Requires: Python 3.7+, PyTorch 1.8.0+
 
 ## Features
 
@@ -173,6 +175,7 @@ There are many ancillary statistics that are being computed that you don't need 
 
 ### What you can expect in performance
 
+<<<<<<< HEAD
 
 
 For Providence Recurrent architectures on the NASA '08 PHM challenge datasets
@@ -222,7 +225,18 @@ LSTM
 
 # Citing Providence
 
-TODO: with Luke, once IEEE is posted and Bibtex can be downloaded
+If you choose to use this work, please cite with the following BibTex
+
+@INPROCEEDINGS{9843469,
+  author={Fox, Stephen and Zimmerman, Elizabeth and Daly, Tynan and O'Keeffe, Michael and Verleyen, Wim},
+  booktitle={2022 IEEE Aerospace Conference (AERO)}, 
+  title={Providence - a Deep Learning Framework for Time-to-Event Prediction}, 
+  year={2022},
+  volume={},
+  number={},
+  pages={1-10},
+  doi={10.1109/AERO53065.2022.9843469}}
+```
 
 # Compliance
 
@@ -234,7 +248,7 @@ The Control Plan (CONTROL_PLAN.rst) contains requriements for participant compli
 Unpublished data within this repository can be used by RTX users only. See the License and Required Marking (LICENSE_AND_REQUIRED_MARKING.rst) for more details and information on distribution.
 
 
-[Alternate Means of Compliance (AMOC) Paper](https://devops.utc.com/-/media/Project/Corp/Corp-Intranet/Mattermost/DevOps-site2/Files/AMOC225_whitepaper_v1_2021-05-13.pdf?rev=cd7bf410327f42d1bff28fad89960b12&hash=0C423C181E00D0732AF0FA4F7061670C)_
+[Alternate Means of Compliance (AMOC) Paper](https://devops.utc.com/-/media/Project/Corp/Corp-Intranet/Mattermost/DevOps-site2/Files/AMOC225_whitepaper_v1_2021-05-13.pdf?rev=cd7bf410327f42d1bff28fad89960b12&hash=0C423C181E00D0732AF0FA4F7061670C)
 
 ## Restrictions
 **All users must understand and comply with the license and control plan files from the previous section.**

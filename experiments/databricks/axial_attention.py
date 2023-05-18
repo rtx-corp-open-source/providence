@@ -491,7 +491,7 @@ def main(experiment_num: int = typer.Argument(1, help="experiment number", min=1
         now_dt_string(),
     )
     experiment_id = create_or_set_experiment(
-        "/Users/40000889@azg.utccgl.com/Providence-Investigative-Research/Attention Axis Re-evaluation (legacy code)"
+        "/Users/{UserNameHere}/Providence-Investigative-Research/Attention Axis Re-evaluation (legacy code)"
     )
 
     if experiment_num == 1:

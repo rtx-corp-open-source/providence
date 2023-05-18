@@ -63,7 +63,7 @@ def mlflow_epoch(dls, model, optimizer, *, step: int = None, loss_criterion):
 #
 ################################################################################
 
-EXPERIMENT_NAME = "/Users/40000889@azg.utccgl.com/Providence-Investigative-Research/{}"
+EXPERIMENT_NAME = "/Users/{UserNameHere}/Providence-Investigative-Research/{}"
 try:
     ROOT_DIR = Path("/dbfs/FileStore/AIML/scratch/Providence-MSE-Loss-Checks")
     ROOT_DIR.mkdir(exist_ok=True, parents=True)

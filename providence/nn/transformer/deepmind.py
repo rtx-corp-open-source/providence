@@ -52,7 +52,10 @@ from torch.nn import functional as F
 from torch.nn import LayerNorm
 from torch.nn import Linear
 from torch.nn import ModuleList
+<<<<<<< HEAD
 from typeguard import typechecked
+=======
+>>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
 
 from providence.nn.rnn import get_activation
 from providence.types import LengthsTensor
@@ -391,7 +394,10 @@ class CausalSelfAttention(Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
 
+<<<<<<< HEAD
     @typechecked
+=======
+>>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
     def forward(self, x: Float[pt.Tensor, batch_time_embedding]) -> Float[pt.Tensor, batch_time_embedding]:
         """Apply causal self-attention on input ``x``.
 
@@ -603,7 +609,10 @@ class Encoder(Module):
         self.inner_mlp = Linear(pseudo_embedding_dim, self.ff_dim)
         self.outer_mlp = Linear(self.ff_dim, pseudo_embedding_dim)
 
+<<<<<<< HEAD
     @typechecked
+=======
+>>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
     def forward(self, X: Float[pt.Tensor, time_embedding]) -> Float[pt.Tensor, time_embedding]:
         """Perform encoding forwmard pass per algorithm 9 of the paper.
 

@@ -1,6 +1,11 @@
 """
 This script captures the key-value correspondence between a reference model and their best case performance
 given all of the parameters we have available to configure the space.
+<<<<<<< HEAD
+=======
+If you follow this file, you should get *better* results than were published in Providence
+(work avaiable to read at https://ieeexplore.ieee.org/document/9843469 or by DOI: 10.1109/AERO53065.2022.9843469)
+>>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
 
 Include everything for the best performance on the NASA FD00X subsets
 -   Hyperparameters
@@ -350,6 +355,14 @@ NASA_Aggregate_LSTM.best_metrics = pd.DataFrame(
 
 
 def Backblaze_VanillaRNN():
+<<<<<<< HEAD
+=======
+    # TODO(stephen): WIP. Finish all of these
+    ProvidenceVanillaRNN
+    dict(**optimizer_default_config(), # defaults first
+        batch_size=1, learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam)
+    dict(input_size=feature_counts["backblaze"], hidden_size=128, num_layers=2, dropout=0.6)
+>>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
     ...
 
 

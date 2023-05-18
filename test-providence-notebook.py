@@ -123,7 +123,7 @@ from providence.utils import configure_logger_in_dir, now_dt_string
 from torch import device as torch_device, initial_seed
 import numpy as np
 
-experiment_id = mlflow.set_experiment("/Users/40000889@azg.utccgl.com/Providence Reproductions").experiment_id
+experiment_id = mlflow.set_experiment("Users/{UserNameHere}/Providence Reproductions").experiment_id
 
 minimize_torch_runtime_overhead()
 

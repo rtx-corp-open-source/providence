@@ -191,7 +191,7 @@ for run_index in range(1, 3):
     start_perf_time = perf_counter()
 
     with mlflow.start_run(
-        experiment_id=create_or_set_experiment("/Users/40000889@azg.utccgl.com/Providence on Horovod")
+        experiment_id=create_or_set_experiment("/Users/{UserNameHere}/Providence on Horovod")
     ) as ml_run:
         run_params = {  # yapf: skip
             "model_seed": pt.initial_seed(),

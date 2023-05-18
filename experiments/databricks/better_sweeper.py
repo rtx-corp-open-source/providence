@@ -108,7 +108,7 @@ def recursive_delete(directory: Path) -> None:
 
 # COMMAND ----------
 
-experiment_name = "/Users/40000889@azg.utccgl.com/ProvidenceReproductionNotebooks/Backblaze GRU (Linear)"
+experiment_name = "/Users/{UserNameHere}/ProvidenceReproductionNotebooks/Backblaze GRU (Linear)"
 
 try:
     EXPERIMENT_ID = mlflow.create_experiment(experiment_name)

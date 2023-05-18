@@ -29,8 +29,6 @@ sphinx-gallery
 # training new models
 seaborn
 
-typeguard==2.13.3
-
 # Documentation building
 myst-parser
 ipykernel

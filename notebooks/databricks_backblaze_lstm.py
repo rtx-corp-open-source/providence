@@ -55,7 +55,7 @@ import mlflow
 
 # COMMAND ----------
 
-experiment_name = "/Users/40000889@azg.utccgl.com/ProvidenceReproductionNotebooks/Backblaze LSTM"
+experiment_name = "/Users/{UserNameHere}/ProvidenceReproductionNotebooks/Backblaze LSTM"
 
 try:
     EXPERIMENT_ID = mlflow.create_experiment(experiment_name)
