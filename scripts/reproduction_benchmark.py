@@ -399,80 +399,129 @@ Backblaze_VanillaRNN.best_metrics = pd.DataFrame({
 
 
 def Backblaze_LSTM(data_root_path: str, outputs_root: str):
-    
-    opt_params = dict(**optimizer_default_config(),
-        batch_size=8,learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam
+
+    opt_params = dict(
+        **optimizer_default_config(),
+        batch_size=8,
+        learning_rate=3e-3,
+        num_epochs=700,
+        schedule_T_mult=2,
+        schedule_min=1e-5,
+        type=pt.optim.Adam
     )
     model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, dropout=0.75, num_layers=3)
     seed = 11068621650300516211
 
     model, metrics = do_model_run(
-        ProvidenceLSTM,
-        _backblaze_dls_func(data_root_path),
-        seed,
-        opt_params,
-        model_params,
-        callback_default_config(),
-        outputs_root,
-        training_epoch
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
+        outputs_root, training_epoch
     )
 
     return model, metrics
 
+
 # paper: MSE 1113.22, MFE 22.36, SMAPE 0.43, SMPE -0.27
-Backblaze_LSTM.best_metrics = pd.DataFrame({
-    "MSE": [788.1],
-    "MFE": [1.68],
-    "SMAPE": [0.332],
-    "SMPE": [0.07]
-})
+Backblaze_LSTM.best_metrics = pd.DataFrame({"MSE": [788.1], "MFE": [1.68], "SMAPE": [0.332], "SMPE": [0.07]})
 
 
 def Backblaze_GRU(data_root_path: str, outputs_root: str):
-    opt_params = dict(batch_size=64, learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam)
+    opt_params = dict(
+        batch_size=64, learning_rate=3e-3, num_epochs=700, schedule_T_mult=2, schedule_min=1e-5, type=pt.optim.Adam
+    )
     model_params = dict(input_size=feature_counts["backblaze"], hidden_size=1024, dropout=0.3, num_layers=2)
     seed = 11068621650300516211
 
     model, metrics = do_model_run(
-        ProvidenceLSTM,
-        _backblaze_dls_func(data_root_path),
-        seed,
-        opt_params,
-        model_params,
-        callback_default_config(),
-        outputs_root,
-        training_epoch
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
+        outputs_root, training_epoch
     )
 
     return model, metrics
 
+
 # paper: MSE 834.77, MFE 17.46, SMAPE 0.38, SMPE -0.18
-Backblaze_GRU.best_metrics = pd.DataFrame(
+Backblaze_GRU.best_metrics = pd.DataFrame({
+    "MFE": [-0.154],
+    "MSE": [678.2],
+    "SMAPE": [0.309],
+    "SMPE": [0.093],
+})
+
+
+def BackblazeExtended_VanillaRNN(data_root_path: str, outputs_root: str):
+    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5)
+    opt_params = dict(batch_size=8, num_epochs=100, learning_rate=1e-3, optim_type=pt.optim.Adam)
+    seed = 5002337303666687583
+
+    model, metrics = do_model_run(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
+        outputs_root, training_epoch
+    )
+
+    return model, metrics
+
+
+
+
+# paper: MSE 6316, MFE -73.33, SMAPE 0.58, 0.57
+BackblazeExtended_VanillaRNN.best_metrics = pd.DataFrame(
     {
-        "MFE": [-0.154],
-        "MSE": [678.2],
-        "SMAPE": [0.309],
-        "SMPE": [0.093],
+        "MFE": [35.48],
+        "MSE": [2411.3],
+        "SMAPE": [0.534],
+        "SMPE": [-0.427],
     }
 )
 
 
-def BackblazeExtended_VanillaRNN():
-    ...
+
+def BackblazeExtended_GRU(data_root_path: str, outputs_root: str):
+    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5)
+    opt_params = dict(batch_size=32, num_epochs=700, learning_rate=3e-3, schedule_T_mult=2, schedule_min=1e-5, optim_type=pt.optim.Adam)
+    seed = 11068621650300516211
+
+    model, metrics = do_model_run(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
+        outputs_root, training_epoch
+    )
+
+    return model, metrics
 
 
-BackblazeExtended_VanillaRNN.best_metrics = pd.DataFrame(...)
 
 
-def BackblazeExtended_LSTM():
-    ...
+# paper: MSE 924.9, MFE 14.11, SMAPE 0.37, SMPE -0.15
+BackblazeExtended_GRU.best_metrics = pd.DataFrame(
+    {
+        "MFE": [-2.312],
+        "MSE": [520.1],
+        "SMAPE": [0.276],
+        "SMPE": [0.128],
+    }
+)
+
+def BackblazeExtended_LSTM(data_root_path: str, outputs_root: str):
+    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5)
+    opt_params = dict(batch_size=8, num_epochs=100, learning_rate=1e-3, schedule_T_mult=2, schedule_min=1e-5, optim_type=pt.optim.Adam)
+    seed = 15620825294243023828
+
+    model, metrics = do_model_run(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
+        outputs_root, training_epoch
+    )
+
+    return model, metrics
 
 
-BackblazeExtended_LSTM.best_metrics = pd.DataFrame(...)
 
 
-def BackblazeExtended_GRU():
-    ...
+# paper: MSE 610.86, MFE 14.45, SMAPE 0.37, SMPE -0.16
+BackblazeExtended_LSTM.best_metrics = pd.DataFrame(
+    {
+        "MFE": [0.809],
+        "MSE": [515.8],
+        "SMAPE": [0.276],
+        "SMPE": [0.094],
+    }
+)
 
-
-BackblazeExtended_GRU.best_metrics = pd.DataFrame(...)
