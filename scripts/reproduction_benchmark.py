@@ -18,8 +18,10 @@ For engineering:
 Export controlled - see license file
 """
 from collections import defaultdict
+from ctypes import Union
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple, TypeAlias
+from typing import TypedDict
 from typing import Type
 
 import pandas as pd
@@ -98,11 +100,57 @@ def optimizer_default_config() -> dict:
     return optim_config
 
 
-def do_model_run(
+class TransformerModelParams(TypedDict):
+    ...
+
+
+class RnnModelParams(TypedDict):
+    """Parameters for the RNN-typed Providence model to be instantiated.
+
+    Args:
+        input_size: number of inputs received. Should be a value in ``feature_counts``
+        hidden_size: number of hidden inputs in the recurrent cell
+        num_layers: number of repetitions of the recurrent cell in the model. Tends not to exceed 5
+        dropout: float within [0, 1] that determines the (approximate) number of nodes that are set to zero every forward pass
+    """
+    input_size: int
+    hidden_size: int
+    num_layers: int
+    dropout: float
+
+
+ModelParams: TypeAlias = Union[RnnModelParams, TransformerModelParams]
+
+
+class OptimizerParams(TypedDict):
+    """Parameters for the optimization algorithm that is used to update our model weights.
+
+    Includes (hyper)parameters that aren't typically bundled with the optimizer, but serve no other purpose but the
+    rate and/or likelihood of optimization (e.g. batch size), so they live here
+
+    Args:
+        batch_size: the number of entities per batch
+        type: the type (not the instance) of an Optimizer for training your model
+        learning_rate: multiplier for the weight update
+        num_epochs: number of epochs to train for, at a maximum. Has obvious interactions with EarlyStopping and EmergencyBrake
+        schedule_min: the lowest attainable learning rate with the learning rate schedule(r)
+        schedule_T_mult: a multiplier within the scheduler learning rate-updater. See documentation of the LearningRateScheduler for more.
+    """
+    batch_size: int
+    type: Type[pt.optim.Optimizer]
+    learning_rate: float
+    num_epochs: int
+
+    # these are bounds for the learning rate schedule. See callabacks.LearningRateScheduler for more
+    schedule_min: float
+    schedule_T_mult: float
+
+
+def train_providence_model(
     model_type: Type[ProvidenceModule],
     get_dls: Callable[[], DataLoaders],
     random_seed: int,
-    optim_params: dict,
+    optim_params: OptimizerParams,
     model_params: dict,
     callback_config: dict,
     outputs_root_dir: Path,
@@ -128,23 +176,16 @@ def do_model_run(
     logger = configure_logger_in_dir(output_dir)
     cbs = [
         LearningRateScheduler(
-            optimizer.opt,
-            T_mult=optim_params["schedule_T_mult"],
-            eta_min=optim_params["schedule_min"],
+            optimizer.opt, T_mult=optim_params["schedule_T_mult"], eta_min=optim_params["schedule_min"]
         ),
         IntervalMetricsVisualizer(callback_config["visualization_freq"], output_dir, logger=logger),
-        WriteModelOutputs(
-            callback_config["model_output_freq"],
-            output_dir,
-            logger=logger,
-            verbose=False,
-        ),
+        WriteModelOutputs(callback_config["model_output_freq"], output_dir, logger=logger, verbose=False),
         ModelCheckpointer(
             output_dir=(output_dir / "model-checkpoints"),
             track=callback_config["tracking_metric"],
             logger=logger,
             verbose=True,
-            keep_old=5,
+            keep_old=5
         ),
         DeferrableEarlyStopping(
             patience=callback_config["early_stopping.patience"],
@@ -155,8 +196,7 @@ def do_model_run(
         LearningCurveTracker(1000, output_dir=(output_dir / "learning_curve")),
     ]
     trainer = Trainer(epoch_definition)
-    # run_config to something we can log to mlflow
-
+    # convert run_config to something we can log to mlflow
     dls = get_dls()
     print("Starting training with config\n{}".format(nest_keys(run_config)))
     losses = trainer.callback_training(model, optimizer, dls, cbs)
@@ -182,6 +222,40 @@ feature_counts = {
 }
 
 
+def _nasa_dls_func(data_root_path):
+    train_ds, val_ds = NasaDatasets(data_root=data_root_path)
+    # NOTE: this is not best practice, but it simplified things for the paper. Holdout sets aren't *required*
+    test_ds = val_ds
+
+    def fresh_dls(bs: int):  # replicate what was done above. Just do it again
+        return CustomProvidenceDataloaders(
+            train_ds,
+            val_ds,
+            batch_size=bs,
+            num_workers=1,
+            pin_memory=True,
+        )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1, num_workers=1))
+
+    return fresh_dls
+
+
+def _backblaze_dls_func(data_root_path: str):
+    train_ds, val_ds = NasaDatasets(data_root=data_root_path)
+    # NOTE: this is not best practice, but it simplified things for the paper. Holdout sets aren't *required*
+    test_ds = val_ds
+
+    def fresh_dls(bs: int):  # replicate what was done above. Just do it again
+        return CustomProvidenceDataloaders(
+            train_ds,
+            val_ds,
+            batch_size=bs,
+            num_workers=1,
+            pin_memory=True,
+        )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1, num_workers=1))
+
+    return fresh_dls
+
+
 # NOTE one of these is redundant, as its covered in the paper_reproductions module
 # NOTE: these statefully set the global seed.
 def NASA_Aggregate_VanillRNN(data_root_path: str, outputs_root: str):
@@ -197,17 +271,17 @@ def NASA_Aggregate_VanillRNN(data_root_path: str, outputs_root: str):
             with the file model checkpoint output by ``ModelCheckpointer``
         metrics: output of ``GeneralMetrics``
     """
-    optim_params = dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=200)
+    opt_params = dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=200)
     model_params = dict(input_size=feature_counts["nasa"], hidden_size=64, num_layers=2, dropout=0.3)
     seed = 11068621650300516211
 
-    model, metrics = do_model_run(
+    model, metrics = train_providence_model(
         ProvidenceVanillaRNN,
         _nasa_dls_func(data_root_path),
         random_seed=seed,
-        optim_params=optim_params,
+        optim_params=opt_params,
         model_params=model_params,
-        callback_config=callback_default_config(),
+        callback_config=callback_default_config(opt_params["num_epochs"]),
         outputs_root_dir=outputs_root,
         epoch_definition=training_epoch,
     )
@@ -221,7 +295,7 @@ NASA_Aggregate_VanillRNN.best_metrics = pd.DataFrame(
         "SMAPE": [0.13],
         "SMPE": [0.003],
     }
-)  # yapf: disable
+)
 
 
 def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
@@ -237,31 +311,29 @@ def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
             with the file model checkpoint output by ``ModelCheckpointer``
         metrics: output of ``GeneralMetrics``
     """
-    optim_params = dict(**optimizer_default_config(), batch_size=2, learning_rate=1e-3, num_epochs=50)
+    opt_params = dict(**optimizer_default_config(), batch_size=2, learning_rate=1e-3, num_epochs=50)
     model_params = dict(input_size=feature_counts["nasa"], hidden_size=512, num_layers=3, dropout=0.75)
     seed = 11068621650300516211
 
-    model, metrics = do_model_run(
+    model, metrics = train_providence_model(
         ProvidenceGRU,
         _nasa_dls_func(data_root_path),
         random_seed=seed,
-        optim_params=optim_params,
+        optim_params=opt_params,
         model_params=model_params,
-        callback_config=callback_default_config(),
+        callback_config=callback_default_config(opt_params["num_epochs"]),
         outputs_root_dir=outputs_root,
         epoch_definition=training_epoch,
     )
     return model, metrics
 
 
-NASA_Aggregate_GRU.best_metrics = pd.DataFrame(
-    {
-        "MSE": [2008.5],
-        "MFE": [-0.215],
-        "SMAPE": [0.13],
-        "SMPE": [0.003],
-    }
-)  # yapf: disable
+NASA_Aggregate_GRU.best_metrics = pd.DataFrame({
+    "MSE": [2008.5],
+    "MFE": [-0.215],
+    "SMAPE": [0.13],
+    "SMPE": [0.003],
+})
 
 
 def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
@@ -277,22 +349,16 @@ def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
             with the file model checkpoint output by ``ModelCheckpointer``
         metrics: output of ``GeneralMetrics``
     """
-    optim_params = dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=40)
+    opt_params = dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=40)
+    model_params = dict(input_size=feature_counts["nasa"], hidden_size=1024, num_layers=3, dropout=0.25)
 
-    model_params = dict(
-        input_size=feature_counts["nasa"],
-        hidden_size=1024,
-        num_layers=3,
-        dropout=0.25,
-    )
-
-    model, metrics = do_model_run(
+    model, metrics = train_providence_model(
         ProvidenceLSTM,
         _nasa_dls_func(data_root_path),
         random_seed=11068621650300516211,
-        optim_params=optim_params,
+        optim_params=opt_params,
         model_params=model_params,
-        callback_config=callback_default_config(),
+        callback_config=callback_default_config(opt_params["num_epochs"]),
         outputs_root_dir=outputs_root,
         epoch_definition=training_epoch,
     )
@@ -338,6 +404,12 @@ def _backblaze_dls_func(data_root_path: str):
         )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1, num_workers=1))
 
     return fresh_dls
+NASA_Aggregate_LSTM.best_metrics = pd.DataFrame({
+    "MSE": [2008.5],
+    "MFE": [-0.215],
+    "SMAPE": [0.13],
+    "SMPE": [0.003],
+})
 
 
 def Backblaze_VanillaRNN(data_root_path: str, outputs_root: str):
@@ -357,13 +429,13 @@ def Backblaze_VanillaRNN(data_root_path: str, outputs_root: str):
     model_params = dict(input_size=feature_counts["backblaze"], hidden_size=128, num_layers=2, dropout=0.6)
     seed = 15620825294243023828
 
-    model, metrics = do_model_run(
+    model, metrics = train_providence_model(
         ProvidenceVanillaRNN,
         _backblaze_dls_func(data_root_path),
         random_seed=seed,
         optim_params=opt_params,
         model_params=model_params,
-        callback_config=callback_default_config(),
+        callback_config=callback_default_config(opt_params["num_epochs"]),
         outputs_root_dir=outputs_root,
         epoch_definition=training_epoch
     )
@@ -395,9 +467,9 @@ def Backblaze_LSTM(data_root_path: str, outputs_root: str):
     model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, dropout=0.75, num_layers=3)
     seed = 11068621650300516211
 
-    model, metrics = do_model_run(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
-        outputs_root, training_epoch
+    model, metrics = train_providence_model(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
+        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
     )
 
     return model, metrics
@@ -424,9 +496,9 @@ def Backblaze_GRU(data_root_path: str, outputs_root: str):
     model_params = dict(input_size=feature_counts["backblaze"], hidden_size=1024, dropout=0.3, num_layers=2)
     seed = 11068621650300516211
 
-    model, metrics = do_model_run(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
-        outputs_root, training_epoch
+    model, metrics = train_providence_model(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
+        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
     )
 
     return model, metrics
@@ -458,9 +530,9 @@ def BackblazeExtended_VanillaRNN(data_root_path: str, outputs_root: str):
     opt_params = dict(**optimizer_default_config(), batch_size=8, num_epochs=100, learning_rate=1e-3)
     seed = 5002337303666687583
 
-    model, metrics = do_model_run(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
-        outputs_root, training_epoch
+    model, metrics = train_providence_model(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
+        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
     )
 
     return model, metrics
@@ -494,9 +566,9 @@ def BackblazeExtended_GRU(data_root_path: str, outputs_root: str):
     opt_params = dict(**optimizer_default_config(), batch_size=32, num_epochs=700, learning_rate=3e-3)
     seed = 11068621650300516211
 
-    model, metrics = do_model_run(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
-        outputs_root, training_epoch
+    model, metrics = train_providence_model(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
+        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
     )
 
     return model, metrics
@@ -530,9 +602,9 @@ def BackblazeExtended_LSTM(data_root_path: str, outputs_root: str):
     opt_params = dict(**optimizer_default_config(), batch_size=8, num_epochs=100, learning_rate=1e-3)
     seed = 15620825294243023828
 
-    model, metrics = do_model_run(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params, callback_default_config(),
-        outputs_root, training_epoch
+    model, metrics = train_providence_model(
+        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
+        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
     )
 
     return model, metrics
