@@ -26,6 +26,10 @@ Clone this repository and perform a local installation via `pip`.
 ```
 
 ## Features
+Below is an overview of the `providence` library's offerings.
+
+![providence framework flow diagram](./images/Providence-pipelines.png)
+
 
 - Train deep sequential models that predict (discretized) Weibull distributions, _at every time step_
 - One-line initialization of a `DataLoader` on our data i.e. PHM Challenge '08 NASA Turbofan CMAPSS or Backblaze Harddrive SMART Stats
