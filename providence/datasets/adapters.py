@@ -11,12 +11,13 @@ Export controlled - see license file
 """
 import io
 from enum import Enum
+import json
 from logging import getLogger
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from shutil import move
 from shutil import unpack_archive
-from typing import Final
+from typing import Final, Optional
 from typing import List
 from typing import Literal
 from typing import Union
@@ -358,13 +359,13 @@ def get_nasa_subset_normalization_stats(subset_id: T_NASA_SUBSET_ID) -> DataFram
     if subset_id is not None and subset_id not in (valid_identifiers := {"all", *NasaTurbofanTest.all()}):
         raise ValueError(f"{subset_id = } is an invalid identifier for a NASA subset. Try one of {valid_identifiers}")
 
-    if subset_id is None or subset_id == "all":
-        stats = _NasaNormalizationSummary.statistics[None]
-    else:
-        stats = _NasaNormalizationSummary.statistics[subset_id]
+    stats = {
+        "mean": _NasaNormalizationSummary.get_feature_means(subset_id),
+        "std": _NasaNormalizationSummary.get_feature_stddevs(subset_id),
+    }
 
     df = DataFrame(stats)
-    return df.rename({"stddev": "std"}, axis="columns")
+    return df
 
 
 class _NasaNormalizationSummary:
@@ -375,28 +376,25 @@ class _NasaNormalizationSummary:
     Standard deviations close to zero (< 1e-15) are set equal to one for numerical stability
     """
 
-    statistics = {
-        None: {"mean": [], "stddev": []},
-        1: {
-            "mean": [],
-            "stddev": [],
-        },
-        2: {
-            "mean": [],
-            "stddev": [],
-        },
-        3: {
-            "mean": [],
-            "stddev": [],
-        },
-        4: {
-            "mean": [],
-            "stddev": [],
-        },
-    }  # type: dict
+    statistics = json.load(open((Path(__file__).parent / "nasa_summary_stats.json"))) # type: dict
 
     def __init__(self, dataset_number: int = None):
         self.dataset_number = dataset_number
+
+    # class methods
+
+    @classmethod
+    def get_feature_means(cls, dataset_number: Optional[int]) -> List[float]:
+        key = "" if dataset_number is None else str(dataset_number)
+        return cls.statistics[key]["mean"]
+
+    @classmethod
+    def get_feature_stddevs(cls, dataset_number: Optional[int]) -> List[float]:
+        key = "" if dataset_number is None else str(dataset_number)
+        return cls.statistics[key]["stddev"]
+
+    # instance methods.
+    # NOTE: the following are unused and likely deprecated.
 
     def get_means(self) -> List[float]:
         return self.statistics[self.dataset_number]["mean"]

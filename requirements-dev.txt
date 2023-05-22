@@ -21,7 +21,6 @@ Sphinx
 sphinx_rtd_theme
 pytest_cov
 sphinx-gherkindoc
-dx-rotor-sphinx
 sphinx-icontract
 sphinx-gallery
 
