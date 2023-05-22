@@ -6,6 +6,8 @@ If you follow this file, you should get *better* results than were published in 
 bound to each instantiation.
 (Providence is avaiable to read at https://ieeexplore.ieee.org/document/9843469 or by DOI: 10.1109/AERO53065.2022.9843469)
 
+We don't share model weights simply because we've found these parameters to be robust, unless otherwise noted.
+
 Includes everything for the best performance on the NASA, Backblaze, and BackblazeExtended datasets for the RNN-based models
 -   Hyperparameters
 -   Seeds
@@ -20,7 +22,7 @@ Export controlled - see license file
 from collections import defaultdict
 from ctypes import Union
 from pathlib import Path
-from typing import Callable, NamedTuple, TypeAlias
+from typing import Any, Callable, NamedTuple, TypeAlias
 from typing import TypedDict
 from typing import Type
 
@@ -38,7 +40,7 @@ from providence.nn.rnn import ProvidenceLSTM
 from providence.nn.rnn import ProvidenceVanillaRNN
 from providence.nn.transformer import ProvidenceTransformer
 from providence.paper_reproductions import GeneralMetrics
-from providence.training import OptimizerWrapper
+from providence.training import OptimizerWrapper, ProvidenceLossInterfaceType
 from providence.training import set_torch_default_dtypes
 from providence.training import training_epoch
 from providence.training import use_gpu_if_available
@@ -256,366 +258,174 @@ def _backblaze_dls_func(data_root_path: str):
     return fresh_dls
 
 
-# NOTE one of these is redundant, as its covered in the paper_reproductions module
-# NOTE: these statefully set the global seed.
-def NASA_Aggregate_VanillRNN(data_root_path: str, outputs_root: str):
-    """Train a vanilla RNN on the NASA Aggregate Dataset.
+class ProvidenceModelWithParams(NamedTuple):
+    # not really a Callable[[ModelParams], ProvidenceModule], but we can't do varargs in callable, so this is what we have
+    model_type: Union[Callable, Type[ProvidenceModule]]
+    model_params: ModelParams
+    opt_params: OptimizerParams
+    seed: int
+    dataloader_func: Callable[[str], DataLoaders]
+    epoch_definition: ProvidenceLossInterfaceType = training_epoch
 
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
+    def train(self, data_root_path: str, outputs_root: str) -> tuple[ProvidenceModule, dict]:
+        """Train the model with the given parameters
 
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    opt_params = dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=200)
-    model_params = dict(input_size=feature_counts["nasa"], hidden_size=64, num_layers=2, dropout=0.3)
-    seed = 11068621650300516211
+        Args:
+            data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
+                Needs read-write permissions.
+            outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
 
-    model, metrics = train_providence_model(
-        ProvidenceVanillaRNN,
-        _nasa_dls_func(data_root_path),
-        random_seed=seed,
-        optim_params=opt_params,
-        model_params=model_params,
-        callback_config=callback_default_config(opt_params["num_epochs"]),
-        outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch,
-    )
-    return model, metrics
+        Return:
+            model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
+                with the file model checkpoint output by ``ModelCheckpointer``
+            metrics: output of ``GeneralMetrics``
+        """
+        model, metrics = train_providence_model(
+            self.model_type,
+            self.dataloader_func(data_root_path),
+            random_seed=self.seed,
+            optim_params=self.opt_params,
+            model_params=self.model_params,
+            callback_config=callback_default_config(self.opt_params["num_epochs"]),
+            outputs_root_dir=outputs_root,
+            epoch_definition=self.epoch_definition,
+        )
+        return model, metrics
 
 
-NASA_Aggregate_VanillRNN.best_metrics = pd.DataFrame(
-    {
+################################################################################
+#
+# The best models themselves
+#
+################################################################################
+
+NASA_Agg_VanillaRnn = ProvidenceModelWithParams(
+    model_type=ProvidenceVanillaRNN,
+    model_params=dict(input_size=feature_counts["nasa"], hidden_size=64, num_layers=2, dropout=0.3),
+    opt_params=dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=200),
+    seed=11068621650300516211,
+    dataloader_func=_nasa_dls_func,
+    best_metrics=pd.DataFrame({
         "MSE": [2008.5],
         "MFE": [-0.215],
         "SMAPE": [0.13],
         "SMPE": [0.003],
-    }
+    })
 )
 
+NASA_Agg_GRU = ProvidenceModelWithParams(
+    model_type=ProvidenceGRU,
+    model_params=dict(input_size=feature_counts["nasa"], hidden_size=512, num_layers=3, dropout=0.75),
+    opt_params=dict(**optimizer_default_config(), batch_size=2, learning_rate=1e-3, num_epochs=50),
+    seed=11068621650300516211,
+    dataloader_func=_nasa_dls_func,
+    best_metrics=pd.DataFrame({
+        "MSE": [1524.7],
+        "MFE": [-3.181],
+        "SMAPE": [0.105],
+        "SMPE": [0.013],
+    })
+)
 
-def NASA_Aggregate_GRU(data_root_path: str, outputs_root: str):
-    """Train a GRU RNN on the NASA Aggregate Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    opt_params = dict(**optimizer_default_config(), batch_size=2, learning_rate=1e-3, num_epochs=50)
-    model_params = dict(input_size=feature_counts["nasa"], hidden_size=512, num_layers=3, dropout=0.75)
-    seed = 11068621650300516211
-
-    model, metrics = train_providence_model(
-        ProvidenceGRU,
-        _nasa_dls_func(data_root_path),
-        random_seed=seed,
-        optim_params=opt_params,
-        model_params=model_params,
-        callback_config=callback_default_config(opt_params["num_epochs"]),
-        outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch,
-    )
-    return model, metrics
-
-
-NASA_Aggregate_GRU.best_metrics = pd.DataFrame({
-    "MSE": [2008.5],
-    "MFE": [-0.215],
-    "SMAPE": [0.13],
-    "SMPE": [0.003],
-})
-
-
-def NASA_Aggregate_LSTM(data_root_path: str, outputs_root: str):
-    """Train a LSTM RNN on the NASA Aggregate Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    opt_params = dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=40)
-    model_params = dict(input_size=feature_counts["nasa"], hidden_size=1024, num_layers=3, dropout=0.25)
-
-    model, metrics = train_providence_model(
-        ProvidenceLSTM,
-        _nasa_dls_func(data_root_path),
-        random_seed=11068621650300516211,
-        optim_params=opt_params,
-        model_params=model_params,
-        callback_config=callback_default_config(opt_params["num_epochs"]),
-        outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch,
-    )
-    return model, metrics
-
-
-def _nasa_dls_func(data_root_path):
-    train_ds, val_ds = NasaDatasets(data_root=data_root_path)
-    test_ds = val_ds
-
-    def fresh_dls(bs: int):  # replicate what was done above. Just do it again
-        return CustomProvidenceDataloaders(
-            train_ds,
-            val_ds,
-            batch_size=bs,
-            num_workers=1,
-            pin_memory=True,
-        )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1, num_workers=1))
-
-    return fresh_dls
-
-
-NASA_Aggregate_LSTM.best_metrics = pd.DataFrame(
-    {
+NASA_Agg_LSTM = ProvidenceModelWithParams(
+    model_type=ProvidenceGRU,
+    opt_params=dict(**optimizer_default_config(), batch_size=4, learning_rate=3e-3, num_epochs=40),
+    model_params=dict(input_size=feature_counts["nasa"], hidden_size=1024, num_layers=3, dropout=0.25),
+    seed=11068621650300516211,
+    dataloader_func=_nasa_dls_func,
+    best_metrics=pd.DataFrame({
         "MSE": [2008.5],
         "MFE": [-0.215],
         "SMAPE": [0.13],
         "SMPE": [0.003],
-    }
-)  # yapf: disable
+    })
+)
 
-def _backblaze_dls_func(data_root_path: str):
-    train_ds, val_ds = NasaDatasets(data_root=data_root_path)
-    test_ds = val_ds
+Backblaze_VanillaRNN = ProvidenceModelWithParams(
+    model_type=ProvidenceVanillaRNN,
+    opt_params=dict(**optimizer_default_config(), batch_size=1, learning_rate=3e-3, num_epochs=700),
+    model_params=dict(input_size=feature_counts["backblaze"], hidden_size=128, num_layers=2, dropout=0.6),
+    seed=15620825294243023828,
+    dataloader_func=_backblaze_dls_func,
+    best_metrics=pd.DataFrame({
+        "MSE": [795.1],
+        "MFE": [0.969],
+        "SMAPE": [0.328],
+        "SMPE": [0.094],
+    })
+)
 
-    def fresh_dls(bs: int):  # replicate what was done above. Just do it again
-        return CustomProvidenceDataloaders(
-            train_ds,
-            val_ds,
-            batch_size=bs,
-            num_workers=1,
-            pin_memory=True,
-        )._replace(test=ProvidenceDataLoader(test_ds, batch_size=1, num_workers=1))
+Backblaze_LSTM = ProvidenceModelWithParams(
+    model_type=ProvidenceLSTM,
+    opt_params=dict(**optimizer_default_config(), batch_size=8, learning_rate=3e-3, num_epochs=700),
+    model_params=dict(input_size=feature_counts["backblaze"], hidden_size=512, dropout=0.75, num_layers=3),
+    seed=11068621650300516211,
+    dataloader_func=_backblaze_dls_func,
+    # paper: MSE 1113.22, MFE 22.36, SMAPE 0.43, SMPE -0.27
+    best_metrics=pd.DataFrame({
+        "MSE": [788.1],
+        "MFE": [1.68],
+        "SMAPE": [0.332],
+        "SMPE": [0.07]
+    })
+)
 
-    return fresh_dls
-NASA_Aggregate_LSTM.best_metrics = pd.DataFrame({
-    "MSE": [2008.5],
-    "MFE": [-0.215],
-    "SMAPE": [0.13],
-    "SMPE": [0.003],
-})
+Backblaze_GRU = ProvidenceModelWithParams(
+    model_type=ProvidenceGRU,
+    opt_params=dict(**optimizer_default_config(), batch_size=64, learning_rate=3e-3, num_epochs=700),
+    model_params=dict(input_size=feature_counts["backblaze"], hidden_size=1024, dropout=0.3, num_layers=2),
+    seed=11068621650300516211,
+    dataloader_func=_backblaze_dls_func,
+    # paper: MSE 834.77, MFE 17.46, SMAPE 0.38, SMPE -0.18
+    best_metrics=pd.DataFrame({
+        "MFE": [-0.154],
+        "MSE": [678.2],
+        "SMAPE": [0.309],
+        "SMPE": [0.093],
+    })
+)
 
-
-def Backblaze_VanillaRNN(data_root_path: str, outputs_root: str):
-    """Train a vanilla RNN on the Backblaze Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    opt_params = dict(**optimizer_default_config(), batch_size=1, learning_rate=3e-3, num_epochs=700)
-    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=128, num_layers=2, dropout=0.6)
-    seed = 15620825294243023828
-
-    model, metrics = train_providence_model(
-        ProvidenceVanillaRNN,
-        _backblaze_dls_func(data_root_path),
-        random_seed=seed,
-        optim_params=opt_params,
-        model_params=model_params,
-        callback_config=callback_default_config(opt_params["num_epochs"]),
-        outputs_root_dir=outputs_root,
-        epoch_definition=training_epoch
-    )
-    return model, metrics
-
-
-Backblaze_VanillaRNN.best_metrics = pd.DataFrame({
-    "MSE": [795.1],
-    "MFE": [0.969],
-    "SMAPE": [0.328],
-    "SMPE": [0.094],
-})
-
-
-def Backblaze_LSTM(data_root_path: str, outputs_root: str):
-    """Train an LSTM RNN on the Backblaze Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    opt_params = dict(**optimizer_default_config(), batch_size=8, learning_rate=3e-3, num_epochs=700)
-    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, dropout=0.75, num_layers=3)
-    seed = 11068621650300516211
-
-    model, metrics = train_providence_model(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
-        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
-    )
-
-    return model, metrics
-
-
-# paper: MSE 1113.22, MFE 22.36, SMAPE 0.43, SMPE -0.27
-Backblaze_LSTM.best_metrics = pd.DataFrame({"MSE": [788.1], "MFE": [1.68], "SMAPE": [0.332], "SMPE": [0.07]})
-
-
-def Backblaze_GRU(data_root_path: str, outputs_root: str):
-    """Train a GRU RNN on the Backblaze Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    opt_params = dict(**optimizer_default_config(), batch_size=64, learning_rate=3e-3, num_epochs=700)
-    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=1024, dropout=0.3, num_layers=2)
-    seed = 11068621650300516211
-
-    model, metrics = train_providence_model(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
-        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
-    )
-
-    return model, metrics
-
-
-# paper: MSE 834.77, MFE 17.46, SMAPE 0.38, SMPE -0.18
-Backblaze_GRU.best_metrics = pd.DataFrame({
-    "MFE": [-0.154],
-    "MSE": [678.2],
-    "SMAPE": [0.309],
-    "SMPE": [0.093],
-})
-
-
-def BackblazeExtended_VanillaRNN(data_root_path: str, outputs_root: str):
-    """Train a vanilla RNN on the BackblazeExtended Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5)
-    opt_params = dict(**optimizer_default_config(), batch_size=8, num_epochs=100, learning_rate=1e-3)
-    seed = 5002337303666687583
-
-    model, metrics = train_providence_model(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
-        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
-    )
-
-    return model, metrics
-
-
-# paper: MSE 6316, MFE -73.33, SMAPE 0.58, 0.57
-BackblazeExtended_VanillaRNN.best_metrics = pd.DataFrame(
-    {
+BackblazeExtended_VanillaRNN = ProvidenceModelWithParams(
+    model_type=ProvidenceVanillaRNN,
+    model_params=dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5),
+    opt_params=dict(**optimizer_default_config(), batch_size=8, num_epochs=100, learning_rate=1e-3),
+    seed=5002337303666687583,
+    dataloader_func=_backblaze_dls_func,
+    # paper: MSE 6316, MFE -73.33, SMAPE 0.58, 0.57
+    best_metrics=pd.DataFrame({
         "MFE": [35.48],
         "MSE": [2411.3],
         "SMAPE": [0.534],
         "SMPE": [-0.427],
-    }
+    })
 )
 
-
-def BackblazeExtended_GRU(data_root_path: str, outputs_root: str):
-    """Train a GRU RNN on the BackblazeExtended Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5)
-    opt_params = dict(**optimizer_default_config(), batch_size=32, num_epochs=700, learning_rate=3e-3)
-    seed = 11068621650300516211
-
-    model, metrics = train_providence_model(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
-        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
-    )
-
-    return model, metrics
-
-
-# paper: MSE 924.9, MFE 14.11, SMAPE 0.37, SMPE -0.15
-BackblazeExtended_GRU.best_metrics = pd.DataFrame(
-    {
+BackblazeExtended_GRU = ProvidenceModelWithParams(
+    model_type=ProvidenceGRU,
+    model_params=dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5),
+    opt_params=dict(**optimizer_default_config(), batch_size=32, num_epochs=700, learning_rate=3e-3),
+    seed=11068621650300516211,
+    dataloader_func=_backblaze_dls_func,
+    # paper: MSE 924.9, MFE 14.11, SMAPE 0.37, SMPE -0.15
+    best_metrics=pd.DataFrame({
         "MFE": [-2.312],
         "MSE": [520.1],
         "SMAPE": [0.276],
         "SMPE": [0.128],
-    }
+    })
 )
 
-
-def BackblazeExtended_LSTM(data_root_path: str, outputs_root: str):
-    """Train an LSTM RNN on the BackblazeExtended Aggregate Dataset.
-
-    Arguments:
-        data_root_path: the root for the download of the dataset. Accelerates data loading (i.e. caching) and debugging data integrity.
-            Needs read-write permissions.
-        outputs_root: the root for the outputs emitted by the callbacks, as well as the metrics CSV. Needs write permissions
-
-    Return:
-        model: the trained model. There may be a model checkpoint that was better than this one, so we encourage you to compare
-            with the file model checkpoint output by ``ModelCheckpointer``
-        metrics: output of ``GeneralMetrics``
-    """
-    model_params = dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5)
-    opt_params = dict(**optimizer_default_config(), batch_size=8, num_epochs=100, learning_rate=1e-3)
-    seed = 15620825294243023828
-
-    model, metrics = train_providence_model(
-        ProvidenceLSTM, _backblaze_dls_func(data_root_path), seed, opt_params, model_params,
-        callback_default_config(opt_params["num_epochs"]), outputs_root, training_epoch
-    )
-
-    return model, metrics
-
-
-# paper: MSE 610.86, MFE 14.45, SMAPE 0.37, SMPE -0.16
-BackblazeExtended_LSTM.best_metrics = pd.DataFrame(
-    {
+BackblazeExtended_LSTM = ProvidenceModelWithParams(
+    model_type=ProvidenceLSTM,
+    model_params=dict(input_size=feature_counts["backblaze"], hidden_size=512, num_layers=2, dropout=0.5),
+    opt_params=dict(**optimizer_default_config(), batch_size=8, num_epochs=100, learning_rate=1e-3),
+    seed=15620825294243023828,
+    dataloader_func=_backblaze_dls_func,
+    # paper: MSE 610.86, MFE 14.45, SMAPE 0.37, SMPE -0.16
+    best_metrics=pd.DataFrame({
         "MFE": [0.809],
         "MSE": [515.8],
         "SMAPE": [0.276],
         "SMPE": [0.094],
-    }
+    })
 )
