@@ -132,6 +132,7 @@ providence/datasets/adapters.py
 providence/datasets/backblaze.py
 providence/datasets/core.py
 providence/datasets/nasa.py
+providence/datasets/nasa_summary_stats.json
 providence/datasets/utils.py
 providence/distributions.py
 providence/loss.py
