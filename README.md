@@ -231,6 +231,7 @@ LSTM
 
 If you choose to use this work, please cite with the following BibTex
 
+```
 @INPROCEEDINGS{9843469,
   author={Fox, Stephen and Zimmerman, Elizabeth and Daly, Tynan and O'Keeffe, Michael and Verleyen, Wim},
   booktitle={2022 IEEE Aerospace Conference (AERO)}, 
@@ -245,11 +246,11 @@ If you choose to use this work, please cite with the following BibTex
 # Compliance
 
 ## License and Export Control
-The License and Required Marking (LICENSE_AND_REQUIRED_MARKING.rst) file provides the license and export control levels of the repository.
+The License and Required Marking (`LICENSE_AND_REQUIRED_MARKING.rst`) file provides the license and export control levels of the repository.
 
 The Control Plan (CONTROL_PLAN.rst) contains requriements for participant compliance with Global Trade policy in this environment.
 
-Unpublished data within this repository can be used by RTX users only. See the License and Required Marking (LICENSE_AND_REQUIRED_MARKING.rst) for more details and information on distribution.
+Unpublished data within this repository can be used by RTX users only. See the License and Required Marking (`LICENSE_AND_REQUIRED_MARKING.rst`) for more details and information on distribution.
 
 
 [Alternate Means of Compliance (AMOC) Paper](https://devops.utc.com/-/media/Project/Corp/Corp-Intranet/Mattermost/DevOps-site2/Files/AMOC225_whitepaper_v1_2021-05-13.pdf?rev=cd7bf410327f42d1bff28fad89960b12&hash=0C423C181E00D0732AF0FA4F7061670C)

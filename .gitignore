@@ -21,3 +21,4 @@ coverage.xml
 tests/log.log
 .data/
 .tmp/
+conda-env-eval/
