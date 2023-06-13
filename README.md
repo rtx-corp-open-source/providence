@@ -14,8 +14,7 @@ It was developed in the context of aerospace engineering and remaining useful-li
 For more general and abstract reading, Michael Betancourt covers the foundations of Surival Analysis / Time-to-Event Modeling [here](https://betanalpha.github.io/assets/case_studies/survival_modeling.html)
 
 ## Installation
-
-Requires: Python 3.8+, PyTorch 1.8.0+
+Requires: Python 3.8+, PyTorch 1.8.0+ 
 
 Clone this repository and perform a local installation via `pip`.
 
@@ -178,9 +177,6 @@ To streamline this inference, you would want to look into the internals of `Metr
 There are many ancillary statistics that are being computed that you don't need to care about.
 
 ### What you can expect in performance
-
-<<<<<<< HEAD
-
 
 For Providence Recurrent architectures on the NASA '08 PHM challenge datasets
 - This is the NASA Aggregate dataset, including all FD001-FD004 devices

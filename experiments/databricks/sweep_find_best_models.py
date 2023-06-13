@@ -20,20 +20,11 @@
 # COMMAND ----------
 # MAGIC %pip install --force /dbfs/FileStore/binaries/providence-1.0.0rc7-py3-none-any.whl
 # COMMAND ----------
-<<<<<<< HEAD
-# export http_proxy=http://devproxy.utc.com:80
-=======
->>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
 import os
 
 from experiments.databricks.axial_attention import transformer_training_epoch
 from providence_utils.trainer import Trainer
 
-<<<<<<< HEAD
-os.environ["http_proxy"] = "http://devproxy.utc.com:80"
-os.environ["https_proxy"] = "http://devproxy.utc.com:80"
-=======
->>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
 
 # COMMAND ----------
 

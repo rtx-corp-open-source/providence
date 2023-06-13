@@ -9,11 +9,7 @@ Providence |version|
 Functional Overview
 -------------------
 
-<<<<<<< HEAD
-See the :doc:`User Guide <userguide>` and `Examples Notebooks <https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/tree/main/examples>`_.
-=======
 See the :doc:`User Guide <userguide>` and `Examples Notebooks <https://github.com/rtx-corp-open-source/providence/tree/main/examples>`_.
->>>>>>> Update the repo with the latest changes from https://github.devops.utc.com/Type-C-Lite/RTXDS-providence/
 
 Documentation
 -------------

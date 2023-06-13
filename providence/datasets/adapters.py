@@ -384,12 +384,12 @@ class _NasaNormalizationSummary:
     # class methods
 
     @classmethod
-    def get_feature_means(cls, dataset_number: Optional[int]) -> List[float]:
+    def get_feature_means(cls, dataset_number: Optional[T_NASA_SUBSET_ID]) -> List[float]:
         key = "" if dataset_number is None else str(dataset_number)
         return cls.statistics[key]["mean"]
 
     @classmethod
-    def get_feature_stddevs(cls, dataset_number: Optional[int]) -> List[float]:
+    def get_feature_stddevs(cls, dataset_number: Optional[T_NASA_SUBSET_ID]) -> List[float]:
         key = "" if dataset_number is None else str(dataset_number)
         return cls.statistics[key]["stddev"]
 
