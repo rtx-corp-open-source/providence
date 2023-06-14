@@ -382,15 +382,22 @@ class _NasaNormalizationSummary:
         self.dataset_number = dataset_number
 
     # class methods
+    @classmethod
+    def _parse_dataset_number(cls, dataset_number: Optional[T_NASA_SUBSET_ID]) -> T_NASA_SUBSET_ID:
+        if isinstance(dataset_number, NasaTurbofanTest): return dataset_number.value
+        if isinstance(dataset_number, int): return str(dataset_number)
+        elif dataset_number is None:        return ""
+        elif dataset_number == "all":       return ""
+        else:                               raise ValueError(f"Invalid {dataset_number = }")
 
     @classmethod
     def get_feature_means(cls, dataset_number: Optional[T_NASA_SUBSET_ID]) -> List[float]:
-        key = "" if dataset_number is None else str(dataset_number)
+        key = str(cls._parse_dataset_number(dataset_number))
         return cls.statistics[key]["mean"]
 
     @classmethod
     def get_feature_stddevs(cls, dataset_number: Optional[T_NASA_SUBSET_ID]) -> List[float]:
-        key = "" if dataset_number is None else str(dataset_number)
+        key = str(cls._parse_dataset_number(dataset_number))
         return cls.statistics[key]["stddev"]
 
     # instance methods.

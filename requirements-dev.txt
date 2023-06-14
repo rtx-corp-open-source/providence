@@ -4,6 +4,10 @@
 # Generic
 pre-commit
 
+# DOCUMENTATION
+dx-rotor-sphinx
+
+
 # Testing
 pandas-stubs<2.0.0
 pytest
