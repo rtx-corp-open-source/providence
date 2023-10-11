@@ -5,6 +5,9 @@ https://github.com/fastai/fastcore/blob/90efea31c9b24cde9b9d9800b65dc4e74616bf13
 Module pulled from
 https://github.com/fastai/fastai/blob/c5b9aa050e1ed382b40a7f772a07d74453fdcacb/fastai/torch_core.py#L619
 
+This code was pulled under an Apache 2.0 license. See the LICENSE in this directory.
+(Originally, the Apache 2.0 license here - https://github.com/fastai/fastcore/blob/1cb38a0d8d97091cd3365e669e39db64be40aaa2/LICENSE#L1)
+
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """

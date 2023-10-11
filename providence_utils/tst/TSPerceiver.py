@@ -1,6 +1,9 @@
 """
 The Time Series Perceiver network, courtesy of TSAI, pulled September 21st, 2022
 
+This code was pulled under an Apache 2.0 license. See the LICENSE in this directory.
+(Originally, the Apache 2.0 license here - https://github.com/timeseriesAI/tsai/blob/b66bf0eeb32be9cc4e42b30456f68104d341f377/LICENSE#L1)
+
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
@@ -16,6 +19,7 @@ from providence_utils.fastai_utils import ifnone
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
+
 
 # Internal Cell
 class ScaledDotProductAttention(Module):
@@ -86,7 +90,6 @@ class Attention(Module):
         attn_dropout: float = 0.0,
         res_attention: bool = False,
     ):
-
         d_context = ifnone(d_context, d_latent)
         n_heads = ifnone(n_heads, 1)
         d_head = ifnone(d_head, d_context // n_heads)
@@ -202,7 +205,6 @@ class TSPerceiver(Module):
         fc_dropout=0.0,
         concat_pool=False,
     ):
-
         d_context = ifnone(d_context, d_latent)
 
         # Embedding

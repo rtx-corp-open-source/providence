@@ -2,6 +2,10 @@
 """
 Implementation of the Time Series Transformer from G. Zervais et al, courtesy of TSAI, pulled August 30st, 2022
 
+This code was pulled under an Apache 2.0 license. See the LICENSE in this directory.
+(Originally, the Apache 2.0 license here - https://github.com/timeseriesAI/tsai/blob/b66bf0eeb32be9cc4e42b30456f68104d341f377/LICENSE#L1)
+
+
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
@@ -26,7 +30,6 @@ class _ScaledDotProductAttention(Module):
         self.d_k = d_k
 
     def forward(self, q: Tensor, k: Tensor, v: Tensor, mask: Optional[Tensor] = None):
-
         # MatMul (q, k) - similarity scores for all pairs of positions in an input sequence
         scores = torch.matmul(q, k)  # scores : [bs x n_heads x q_len x q_len]
 
@@ -60,7 +63,6 @@ class _MultiHeadAttention(Module):
         self.W_O = nn.Linear(n_heads * d_v, d_model, bias=False)
 
     def forward(self, Q: Tensor, K: Tensor, V: Tensor, mask: Optional[Tensor] = None):
-
         bs = Q.size(0)
 
         # Linear (+ split in multiple heads)
@@ -111,7 +113,6 @@ class _TSTEncoderLayer(Module):
         dropout: float = 0.1,
         activation: str = "gelu",
     ):
-
         assert d_model // n_heads, f"d_model ({d_model}) must be divisible by n_heads ({n_heads})"
         d_k = ifnone(d_k, d_model // n_heads)
         d_v = ifnone(d_v, d_model // n_heads)
@@ -157,7 +158,6 @@ class _TSTEncoder(Module):
     def __init__(
         self, q_len, d_model, n_heads, d_k=None, d_v=None, d_ff=None, dropout=0.1, activation="gelu", n_layers=1
     ):
-
         self.layers = nn.ModuleList(
             [
                 _TSTEncoderLayer(

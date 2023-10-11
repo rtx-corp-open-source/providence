@@ -5,6 +5,9 @@ An implementation of
     Official implementation: https://github.com/okojoalg/sequencer
 courtesy of TSAI, pulled September 21st, 2022
 
+This code was pulled under an Apache 2.0 license. See the LICENSE in this directory.
+(Originally, the Apache 2.0 license here - https://github.com/timeseriesAI/tsai/blob/b66bf0eeb32be9cc4e42b30456f68104d341f377/LICENSE#L1)
+
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
@@ -15,6 +18,7 @@ from ..imports import *
 from .utils import *
 from .layers import *
 from typing import Callable
+
 
 # Cell
 class _TSSequencerEncoderLayer(nn.Module):
@@ -121,7 +125,6 @@ class _TSSequencerBackbone(Module):
         token_size: int = None,
         tokenizer: Optional[Callable] = None,
     ):
-
         # Categorical embeddings
         if n_cat_embeds is not None:
             n_cat_embeds = listify(n_cat_embeds)
@@ -188,7 +191,6 @@ class _TSSequencerBackbone(Module):
         )
 
     def forward(self, x):
-
         # Categorical embeddings
         x = self.to_cat_embed(x)
 
@@ -298,7 +300,6 @@ class TSSequencerPlus(nn.Sequential):
         custom_head: Optional[Callable] = None,
         verbose: bool = True,
     ):
-
         if use_token and c_out == 1:
             use_token = False
             pv("use_token set to False as c_out == 1", verbose)

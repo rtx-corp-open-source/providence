@@ -1,6 +1,9 @@
 """
 Utilities for the FastAI-dependent code
 
+This code was pulled under an Apache 2.0 license. See the LICENSE in this directory.
+(Originally, the Apache 2.0 license here - https://github.com/fastai/fastcore/blob/1cb38a0d8d97091cd3365e669e39db64be40aaa2/LICENSE#L1)
+
 **Raytheon Technologies proprietary**
 Export controlled - see license file
 """
